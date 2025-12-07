@@ -1,0 +1,629 @@
+openapi: 3.0.3
+info:
+  title: Easy11 Commerce Intelligence Platform API
+  version: 1.0.0
+  description: |
+    Secure, AI-driven e-commerce and analytics API.
+    
+    ### Authentication
+    All endpoints require JWT authentication unless specified otherwise.
+    Use the `/auth/login` endpoint to obtain tokens.
+    
+    ### Rate Limiting
+    - Standard: 100 requests/minute
+    - Search: 200 requests/minute
+    - Admin: 1000 requests/minute
+    
+  contact:
+    name: Ocean & Sameer
+    email: support@easy11.com
+  license:
+    name: MIT
+
+servers:
+  - url: https://api.easy11.com/v1
+    description: Production
+  - url: http://localhost:5000/v1
+    description: Local Development
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Products
+    description: Product catalog management
+  - name: Search
+    description: Product search and filtering
+  - name: Orders
+    description: Order management and checkout
+  - name: Recommendations
+    description: ML-based product recommendations
+  - name: Analytics
+    description: Business analytics and insights
+  - name: Admin
+    description: Administrative operations
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [customer, admin, manager]
+        createdAt:
+          type: string
+          format: date-time
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: float
+        category:
+          type: string
+        image:
+          type: string
+          format: uri
+        stock:
+          type: integer
+        rating:
+          type: number
+          format: float
+        tags:
+          type: array
+          items:
+            type: string
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        total:
+          type: number
+          format: float
+        status:
+          type: string
+          enum: [pending, processing, shipped, delivered, cancelled]
+        createdAt:
+          type: string
+          format: date-time
+
+    OrderItem:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        price:
+          type: number
+          format: float
+
+    Recommendation:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+        score:
+          type: number
+          format: float
+          description: Confidence score (0-1)
+        reason:
+          type: string
+          description: Why this product was recommended
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        statusCode:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+
+    SearchResult:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    Analytics:
+      type: object
+      properties:
+        revenue:
+          type: number
+          format: float
+        orders:
+          type: integer
+        customers:
+          type: integer
+        conversionRate:
+          type: number
+          format: float
+        averageOrderValue:
+          type: number
+          format: float
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Create a new customer account
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - name
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                name:
+                  type: string
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      description: Authenticate and receive JWT tokens
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /products:
+    get:
+      tags:
+        - Products
+      summary: List products
+      description: Get paginated list of products with optional filtering
+      operationId: listProducts
+      security: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+    post:
+      tags:
+        - Products
+      summary: Create product
+      description: Create a new product (Admin only)
+      operationId: createProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Product'
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '403':
+          description: Forbidden - Admin access required
+
+  /products/{productId}:
+    get:
+      tags:
+        - Products
+      summary: Get product by ID
+      description: Retrieve a single product by ID
+      operationId: getProduct
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Product not found
+
+  /search:
+    get:
+      tags:
+        - Search
+      summary: Search products
+      description: |
+        Intelligent product search with Trie-based autocomplete.
+        Supports prefix matching and relevance ranking.
+      operationId: searchProducts
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResult'
+
+  /recommendations/{userId}:
+    get:
+      tags:
+        - Recommendations
+      summary: Get recommendations
+      description: |
+        ML-based product recommendations using ALS matrix factorization.
+        Returns top-N personalized recommendations.
+      operationId: getRecommendations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Recommendations retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recommendations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Recommendation'
+        '401':
+          description: Unauthorized
+
+  /orders:
+    get:
+      tags:
+        - Orders
+      summary: List user orders
+      description: Get orders for authenticated user
+      operationId: listOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Orders retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  total:
+                    type: integer
+
+    post:
+      tags:
+        - Orders
+      summary: Create order
+      description: Place a new order with checkout
+      operationId: createOrder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - items
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/OrderItem'
+                shippingAddress:
+                  type: object
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Validation error
+
+  /orders/{orderId}:
+    get:
+      tags:
+        - Orders
+      summary: Get order by ID
+      description: Retrieve order details
+      operationId: getOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          description: Order not found
+
+  /analytics/revenue:
+    get:
+      tags:
+        - Analytics
+      summary: Get revenue analytics
+      description: Business revenue and KPIs (Admin only)
+      operationId: getRevenue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Analytics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Analytics'
+        '403':
+          description: Admin access required
+
+  /analytics/churn:
+    get:
+      tags:
+        - Analytics
+      summary: Get churn predictions
+      description: ML-based churn predictions with XGBoost
+      operationId: getChurn
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Churn data retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  atRisk:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  lowRisk:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+
+  /analytics/forecast:
+    get:
+      tags:
+        - Analytics
+      summary: Get demand forecast
+      description: Prophet-based time-series forecasting
+      operationId: getForecast
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: horizon
+          in: query
+          schema:
+            type: integer
+            default: 30
+            description: Forecast horizon in days
+      responses:
+        '200':
+          description: Forecast retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  forecast:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        value:
+                          type: number
+

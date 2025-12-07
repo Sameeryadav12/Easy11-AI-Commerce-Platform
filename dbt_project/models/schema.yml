@@ -1,0 +1,49 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: "Staging layer for orders"
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+          
+  - name: stg_products
+    description: "Staging layer for products"
+    columns:
+      - name: product_id
+        tests:
+          - unique
+          - not_null
+          
+  - name: stg_users
+    description: "Staging layer for users"
+    columns:
+      - name: user_id
+        tests:
+          - unique
+          - not_null
+          
+  - name: int_customer_rfm
+    description: "Customer RFM segmentation analysis"
+    columns:
+      - name: user_id
+        tests:
+          - not_null
+      - name: recency_score
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+      - name: frequency_score
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+      - name: monetary_score
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+

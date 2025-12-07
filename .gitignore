@@ -1,0 +1,209 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.env
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.dll
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pids
+*.pid
+*.seed
+*.pid.lock
+pnpm-debug.log*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+.pgdata/
+
+# Testing
+coverage/
+.nyc_output/
+.pytest_cache/
+*.lcov
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Prisma
+backend/prisma/migrations/
+*.prisma.bak
+
+# ML
+ml_service/.mlflow/
+ml_service/models/
+*.pkl
+*.joblib
+*.h5
+*.ckpt
+*.pb
+ml_service/venv/
+
+# dbt
+dbt_project/target/
+dbt_project/dbt_packages/
+dbt_project/dbt_project.yml.bak
+dbt_packages/
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+*.tfvars
+.terraform.lock.hcl
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+jupyter-notebooks/
+
+# Secrets
+*.pem
+*.key
+secrets/
+*.secret
+*.credentials
+
+# AWS
+.aws/
+aws-exports.js
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.cache
+
+# Generated files
+generated/
+*.generated.*
+.generated/
+
+# Build artifacts
+*.tgz
+*.tar.gz
+*.zip
+*.rar
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+
+# TypeScript
+*.tsbuildinfo
+
+# Next.js
+.next/
+out/
+.vercel
+
+# Vite
+dist-ssr/
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Archive (old documentation)
+docs/archive/
+
+# Test files
+TEST_BACKEND.html
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Mac
+.AppleDouble
+.LSOverride
+Icon
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+

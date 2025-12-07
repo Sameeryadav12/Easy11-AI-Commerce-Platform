@@ -1,0 +1,26 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Raw data from OLTP database"
+    database: easy11_dev
+    schema: public
+    tables:
+      - name: orders
+        description: "Raw orders table"
+        
+      - name: products
+        description: "Raw products table"
+        
+      - name: users
+        description: "Raw users table"
+        
+      - name: order_items
+        description: "Raw order_items table"
+        
+      - name: sessions
+        description: "Raw sessions table"
+        
+      - name: audit_logs
+        description: "Raw audit_logs table"
+

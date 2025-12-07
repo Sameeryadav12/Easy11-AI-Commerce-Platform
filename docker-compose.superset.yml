@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # Apache Superset
+  superset:
+    image: apache/superset:latest
+    container_name: easy11-superset
+    environment:
+      - SUPERSET_SECRET_KEY=${SUPERSET_SECRET_KEY}
+      - SUPERSET_LOAD_EXAMPLES=no
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/easy11_dev
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "8088:8088"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./superset_config:/app/pythonpath
+      - superset_data:/app/superset_home
+    command: >
+      sh -c "
+        superset db upgrade &&
+        superset fab create-admin --username admin --firstname Admin --lastname User --email admin@easy11.com --password admin123 &&
+        superset init &&
+        gunicorn --bind 0.0.0.0:8088 --access-logfile - --error-logfile - --workers 4 --worker-class gthread --threads 20 --timeout 60 --limit-request-line 0 --limit-request-field_size 0 superset.app:create_app()
+      "
+    networks:
+      - easy11-network
+
+volumes:
+  superset_data:
+
+networks:
+  easy11-network:
+    external: true
+

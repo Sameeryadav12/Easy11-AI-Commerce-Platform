@@ -1,0 +1,59 @@
+{
+  "info": { "name": "Easy11 Public API v1 (Dev)", "_postman_id": "easy11-dev", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "item": [
+    {
+      "name": "OAuth Token",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "http://localhost:3001/api/oauth/token", "protocol": "http", "host": ["localhost"], "port": "3001", "path": ["api","oauth","token"] },
+        "body": { "mode": "raw", "raw": "{\n  \"grant_type\": \"client_credentials\",\n  \"client_id\": \"dev-partner\",\n  \"client_secret\": \"dev-secret\",\n  \"scope\": \"catalog:read orders:read webhooks:manage\",\n  \"org_id\": \"dev-org\"\n}" }
+      }
+    },
+    {
+      "name": "List Products",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Org-Id", "value": "dev-org" }],
+        "url": { "raw": "http://localhost:3001/api/v1/products", "protocol": "http", "host": ["localhost"], "port": "3001", "path": ["api","v1","products"] }
+      }
+    },
+    {
+      "name": "List Orders",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "X-Org-Id", "value": "dev-org" }],
+        "url": { "raw": "http://localhost:3001/api/v1/orders", "protocol": "http", "host": ["localhost"], "port": "3001", "path": ["api","v1","orders"] }
+      }
+    },
+    {
+      "name": "Register Webhook Endpoint",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "X-Org-Id", "value": "dev-org" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "http://localhost:3001/api/v1/webhooks/endpoints", "protocol": "http", "host": ["localhost"], "port": "3001", "path": ["api","v1","webhooks","endpoints"] },
+        "body": { "mode": "raw", "raw": "{ \"url\": \"http://localhost:8080/webhook-test\", \"events\": [\"order.created\"] }" }
+      }
+    },
+    {
+      "name": "GraphQL (Persisted) getProductsV1",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "X-Org-Id", "value": "dev-org" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "http://localhost:3001/api/v1/graphql", "protocol": "http", "host": ["localhost"], "port": "3001", "path": ["api","v1","graphql"] },
+        "body": { "mode": "raw", "raw": "{ \"id\": \"getProductsV1\", \"variables\": {} }" }
+      }
+    }
+  ],
+  "variable": [{ "key": "access_token", "value": "" }]
+}
+
+

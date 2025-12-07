@@ -1,0 +1,118 @@
+version: '3.9'
+
+services:
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    container_name: easy11-zookeeper
+    restart: unless-stopped
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports:
+      - '2181:2181'
+
+  kafka:
+    image: bitnami/kafka:3.7
+    container_name: easy11-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    ports:
+      - '9092:9092'
+
+  kafka-topics:
+    image: bitnami/kafka:3.7
+    container_name: easy11-kafka-topics
+    depends_on:
+      - kafka
+    entrypoint: >
+      bash -c "
+        /opt/bitnami/kafka/bin/kafka-topics.sh
+        --create
+        --if-not-exists
+        --topic events_ops
+        --bootstrap-server kafka:9092
+        --replication-factor 1
+        --partitions 3
+      "
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: easy11-loki
+    restart: unless-stopped
+    ports:
+      - '3100:3100'
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: easy11-promtail
+    restart: unless-stopped
+    volumes:
+      - ../../logs:/var/log/easy11:ro
+      - ./promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: easy11-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo.yaml"]
+    ports:
+      - '3200:3200'
+      - '4317:4317'
+      - '4318:4318'
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml
+
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: easy11-prometheus
+    restart: unless-stopped
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:11.1.4
+    container_name: easy11-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    ports:
+      - '3030:3000'
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.95.0
+    container_name: easy11-otel-collector
+    restart: unless-stopped
+    command: ['--config=/etc/otelcol/otel-collector.yaml']
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol/otel-collector.yaml
+    ports:
+      - '4317:4317'
+      - '4318:4318'
+    depends_on:
+      - tempo
+      - loki
+      - kafka
+
+volumes:
+  grafana-data:
+
+

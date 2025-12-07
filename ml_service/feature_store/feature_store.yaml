@@ -1,0 +1,28 @@
+project: easy11_ml
+registry: data/registry.db
+provider: local
+
+online_store:
+  type: postgres
+  host: ${FEAST_ONLINE_HOST:localhost}
+  port: ${FEAST_ONLINE_PORT:5432}
+  database: ${FEAST_ONLINE_DATABASE:easy11_online}
+  db_schema: ${FEAST_ONLINE_SCHEMA:feast_online}
+  user: ${FEAST_ONLINE_USER:feast}
+  password: ${FEAST_ONLINE_PASSWORD:feast}
+
+offline_store:
+  type: postgres
+  host: ${FEAST_OFFLINE_HOST:localhost}
+  port: ${FEAST_OFFLINE_PORT:5432}
+  database: ${FEAST_OFFLINE_DATABASE:easy11_warehouse}
+  db_schema: ${FEAST_OFFLINE_SCHEMA:analytics}
+  user: ${FEAST_OFFLINE_USER:feast}
+  password: ${FEAST_OFFLINE_PASSWORD:feast}
+
+entity_key_serialization_version: 2
+
+flags:
+  grpc_connection_pool_size: 10
+  ttl_seconds: 86400
+

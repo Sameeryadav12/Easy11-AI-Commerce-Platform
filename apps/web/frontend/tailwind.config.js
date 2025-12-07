@@ -1,0 +1,125 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  darkMode: 'class', // Enable class-based dark mode
+  theme: {
+    extend: {
+      colors: {
+        // Easy11 Brand Colors
+        navy: {
+          DEFAULT: '#000154',
+          50: '#E6E6F5',
+          100: '#CCCCEB',
+          200: '#9999D7',
+          300: '#6666C3',
+          400: '#3333AF',
+          500: '#000154',
+          600: '#000143',
+          700: '#000132',
+          800: '#000022',
+          900: '#000011',
+        },
+        blue: {
+          DEFAULT: '#1A58D3',
+          50: '#EBF2FE',
+          100: '#D7E5FD',
+          200: '#AFCCFB',
+          300: '#87B2F9',
+          400: '#5F99F7',
+          500: '#1A58D3',
+          600: '#1546A9',
+          700: '#10357F',
+          800: '#0B2355',
+          900: '#06122B',
+        },
+        sky: {
+          DEFAULT: '#52D5FF',
+          50: '#F2FCFF',
+          100: '#E5F9FF',
+          200: '#CCF4FF',
+          300: '#B2EEFF',
+          400: '#99E8FF',
+          500: '#52D5FF',
+          600: '#42AACC',
+          700: '#328099',
+          800: '#215566',
+          900: '#112B33',
+        },
+        teal: {
+          DEFAULT: '#31EE88',
+          50: '#F0FEF6',
+          100: '#E1FDED',
+          200: '#C3FCDB',
+          300: '#A5FAC9',
+          400: '#87F8B7',
+          500: '#31EE88',
+          600: '#27BE6D',
+          700: '#1D8F52',
+          800: '#145F37',
+          900: '#0A301C',
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        heading: ['Poppins', 'system-ui', 'sans-serif'],
+        mono: ['Fira Code', 'Courier New', 'monospace'],
+      },
+      fontSize: {
+        'xs': ['0.75rem', { lineHeight: '1.25' }],
+        'sm': ['0.875rem', { lineHeight: '1.375' }],
+        'base': ['1rem', { lineHeight: '1.5' }],
+        'lg': ['1.125rem', { lineHeight: '1.5' }],
+        'xl': ['1.25rem', { lineHeight: '1.5' }],
+        '2xl': ['1.5rem', { lineHeight: '1.375' }],
+        '3xl': ['1.875rem', { lineHeight: '1.25' }],
+        '4xl': ['2.25rem', { lineHeight: '1.25' }],
+        '5xl': ['3rem', { lineHeight: '1.25' }],
+        '6xl': ['3.75rem', { lineHeight: '1' }],
+      },
+      spacing: {
+        '18': '4.5rem',
+        '88': '22rem',
+        '100': '25rem',
+        '104': '26rem',
+        '112': '28rem',
+        '120': '30rem',
+        '128': '32rem',
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.3s ease-in-out',
+        'slide-up': 'slideUp 0.4s ease-out',
+        'scale-in': 'scaleIn 0.3s ease-out',
+        'spin-slow': 'spin 3s linear infinite',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(20px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        scaleIn: {
+          '0%': { transform: 'scale(0.9)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+      },
+      boxShadow: {
+        'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
+        'soft-lg': '0 10px 40px -5px rgba(0, 0, 0, 0.1), 0 20px 40px -10px rgba(0, 0, 0, 0.05)',
+      },
+      borderRadius: {
+        '4xl': '2rem',
+      },
+      transitionDuration: {
+        '400': '400ms',
+      },
+    },
+  },
+  plugins: [],
+}
+

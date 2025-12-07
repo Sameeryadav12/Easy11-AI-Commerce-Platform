@@ -1,0 +1,17 @@
+{
+  "name": "@easy11/telemetry-client",
+  "version": "0.1.0",
+  "description": "Lightweight telemetry helper for Easy11 web properties",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "license": "MIT",
+  "keywords": [
+    "easy11",
+    "telemetry",
+    "analytics",
+    "observability"
+  ]
+}
+
+
