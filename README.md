@@ -491,8 +491,8 @@ This project is licensed under the MIT License - see [LICENSE](./LICENSE) for de
 
 ## 📧 Contact
 
-- **Ocean**: [LinkedIn](https://linkedin.com/in/ocean) | [Email](mailto:ocean@easy11.com)
-- **Sameer**: [LinkedIn](https://linkedin.com/in/sameer) | [Email](mailto:sameer@easy11.com)
+- **Ocean**: [LinkedIn](https://www.linkedin.com/in/ocean-ocean/) | [Email](mailto:oceanocean1823@gmail.com)
+- **Sameer**: [LinkedIn](https://www.linkedin.com/in/sameer-yadav1) | [Email](mailto:rishisameer7@gmail.com)
 
 ---
 
