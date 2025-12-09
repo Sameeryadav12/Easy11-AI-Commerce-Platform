@@ -461,6 +461,23 @@ For more documentation, see the [docs](./docs/) directory.
 
 ---
 
+## 🚧 Project Status
+
+**Current Status**: Active Development & Testing
+
+This project is currently under active development and testing. We are continuously working on:
+- **Feature Development**: Building and enhancing core functionality
+- **Testing & Quality Assurance**: Comprehensive testing across all components
+- **Performance Optimization**: Improving system performance and scalability
+- **Documentation**: Keeping documentation up-to-date with latest changes
+- **Bug Fixes**: Addressing issues and improving stability
+
+**Note**: As this is an active development project, some features may be in progress or subject to change. We recommend checking the [documentation](./docs/) for the latest updates and known issues.
+
+If you encounter any issues or have suggestions, please feel free to open an issue or contribute to the project.
+
+---
+
 ## 🤝 Contributing
 
 We welcome contributions! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
