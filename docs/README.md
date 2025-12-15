@@ -4,6 +4,7 @@ Welcome to the Easy11 Commerce Intelligence Platform documentation.
 
 ## 🚀 Getting Started
 
+- **[📘 Complete Project Documentation](./COMPLETE_PROJECT_DOCUMENTATION.md)** - **⭐ Comprehensive guide covering the entire project**
 - **[Quick Start Guide](./QUICK_START.md)** - Get the platform running in minutes
 - **[Testing Guide](./TESTING_GUIDE.md)** - Comprehensive testing documentation
 - **[Architecture](./architecture.md)** - System design and architecture
