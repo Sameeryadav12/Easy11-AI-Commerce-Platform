@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import AuthLayout from '../../components/auth/AuthLayout';
 import { Button } from '../../components/ui';
 import { useAuthStore } from '../../store/authStore';
+import { authService } from '../../services/auth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -66,37 +67,16 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      // Simulate API call (1.5 seconds)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Mock API response - In production, call: POST /auth/login
-      // const response = await fetch('/api/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     email: formData.email,
-      //     password: formData.password,
-      //   }),
-      //   credentials: 'include', // Important for httpOnly cookies
-      // });
-
-      // Mock success (replace with real API)
-      const mockUser = {
-        id: '1',
-        email: formData.email,
-        name: formData.email.split('@')[0],
-        role: 'CUSTOMER',
-      };
-
-      const mockResponse = {
-        accessToken: 'mock-jwt-token-' + Date.now(),
-        user: mockUser,
-      };
+      // Call real API
+      const response = await authService.login(formData.email, formData.password);
 
       // Set auth state
-      setAuth(mockResponse);
+      setAuth({
+        user: response.user,
+        accessToken: response.accessToken,
+      });
 
-      toast.success(`Welcome back, ${mockUser.name}!`, {
+      toast.success(`Welcome back, ${response.user.name || response.user.email}!`, {
         icon: '👋',
         duration: 3000,
       });
@@ -105,9 +85,15 @@ export default function LoginPage() {
       navigate(from, { replace: true });
     } catch (error: any) {
       // Generic error (OWASP: no user enumeration)
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Invalid credentials or verification required';
+      
       toast.error('Invalid credentials or verification required', {
         duration: 4000,
       });
+      
+      // Set form errors to show error state
       setErrors({
         email: ' ', // Space to show error state
         password: ' ',

@@ -6,9 +6,12 @@ import toast from 'react-hot-toast';
 import AuthLayout from '../../components/auth/AuthLayout';
 import PasswordStrength from '../../components/auth/PasswordStrength';
 import { Button } from '../../components/ui';
+import { authService } from '../../services/auth';
+import { useAuthStore } from '../../store/authStore';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -98,32 +101,42 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      // Simulate API call (2 seconds)
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Call real API
+      const response = await authService.register(
+        formData.email,
+        formData.password,
+        formData.name
+      );
 
-      // Mock API response - In production, call: POST /auth/register
-      // const response = await fetch('/api/auth/register', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     name: formData.name,
-      //     email: formData.email,
-      //     password: formData.password,
-      //   }),
-      // });
+      // Set auth state
+      setAuth({
+        user: response.user,
+        accessToken: response.accessToken,
+      });
 
       // Generic success message (OWASP: no enumeration)
-      toast.success('Check your email to verify your account!', {
-        duration: 5000,
-        icon: '📧',
+      toast.success('Account created successfully!', {
+        duration: 3000,
+        icon: '✅',
       });
 
-      // Navigate to verification prompt page
-      navigate('/auth/verification-sent', {
-        state: { email: formData.email },
+      // Navigate to account dashboard
+      navigate('/account', { replace: true });
+    } catch (error: any) {
+      // Handle API errors
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Registration failed. Please try again.';
+      
+      // Generic error message (OWASP: no user enumeration)
+      toast.error('Registration failed. Please check your information and try again.', {
+        duration: 4000,
       });
-    } catch (error) {
-      toast.error('Registration failed. Please try again.');
+      
+      // Set form errors if provided by API
+      if (error.response?.data?.errors) {
+        setErrors(error.response.data.errors);
+      }
     } finally {
       setIsSubmitting(false);
     }
