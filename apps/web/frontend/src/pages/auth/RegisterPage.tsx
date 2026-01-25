@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import AuthLayout from '../../components/auth/AuthLayout';
 import PasswordStrength from '../../components/auth/PasswordStrength';
 import { Button } from '../../components/ui';
-import authService from '../../services/auth';
+import authService, { register as registerUser } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
 
 export default function RegisterPage() {
@@ -101,8 +101,21 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
+      // Use direct function import as fallback
+      const registerFunction = authService?.register || registerUser;
+      
+      if (!registerFunction || typeof registerFunction !== 'function') {
+        console.error('Register function not available:', {
+          authService,
+          registerUser,
+          'authService.register': authService?.register,
+          'typeof registerUser': typeof registerUser,
+        });
+        throw new Error('Registration function not available. Please refresh the page.');
+      }
+
       // Call real API
-      const response = await authService.register(
+      const response = await registerFunction(
         formData.email,
         formData.password,
         formData.name
