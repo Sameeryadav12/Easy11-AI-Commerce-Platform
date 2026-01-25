@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import AuthLayout from '../../components/auth/AuthLayout';
 import PasswordStrength from '../../components/auth/PasswordStrength';
 import { Button } from '../../components/ui';
-import { authService } from '../../services/auth';
+import authService from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
 
 export default function RegisterPage() {

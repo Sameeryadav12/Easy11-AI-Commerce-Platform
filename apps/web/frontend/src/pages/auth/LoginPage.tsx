@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import AuthLayout from '../../components/auth/AuthLayout';
 import { Button } from '../../components/ui';
 import { useAuthStore } from '../../store/authStore';
-import { authService } from '../../services/auth';
+import authService from '../../services/auth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -67,6 +67,16 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
+      // Verify authService and login function exist
+      if (!authService) {
+        throw new Error('Authentication service not available');
+      }
+      
+      if (typeof authService.login !== 'function') {
+        console.error('authService.login is not a function:', typeof authService.login, authService);
+        throw new Error('Login function not available. Please refresh the page.');
+      }
+
       // Call real API
       const response = await authService.login(formData.email, formData.password);
 
