@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import AuthLayout from '../../components/auth/AuthLayout';
 import { Button } from '../../components/ui';
 import { useAuthStore } from '../../store/authStore';
-import authService, { login as loginUser } from '../../services/auth';
+import { login } from '../../services/auth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -67,21 +67,16 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      // Use direct function import as fallback
-      const loginFunction = authService?.login || loginUser;
-      
-      if (!loginFunction || typeof loginFunction !== 'function') {
-        console.error('Login function not available:', {
-          authService,
-          loginUser,
-          'authService.login': authService?.login,
-          'typeof loginUser': typeof loginUser,
-        });
+      // Verify login function exists
+      if (typeof login !== 'function') {
+        console.error('[LoginPage] login is not a function:', typeof login, login);
         throw new Error('Login function not available. Please refresh the page.');
       }
 
-      // Call real API - use direct function if available, otherwise use service
-      const response = await loginFunction(formData.email, formData.password);
+      console.log('[LoginPage] Calling login function...');
+      
+      // Call login function directly
+      const response = await login(formData.email, formData.password);
 
       // Validate response structure
       if (!response || !response.user || !response.accessToken) {
