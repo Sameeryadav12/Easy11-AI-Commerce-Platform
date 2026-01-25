@@ -70,6 +70,11 @@ export default function LoginPage() {
       // Call real API
       const response = await authService.login(formData.email, formData.password);
 
+      // Validate response structure
+      if (!response || !response.user || !response.accessToken) {
+        throw new Error('Invalid response from server');
+      }
+
       // Set auth state
       setAuth({
         user: response.user,
@@ -84,12 +89,27 @@ export default function LoginPage() {
       // Redirect to intended page or account
       navigate(from, { replace: true });
     } catch (error: any) {
-      // Generic error (OWASP: no user enumeration)
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Invalid credentials or verification required';
+      console.error('Login error:', error);
       
-      toast.error('Invalid credentials or verification required', {
+      // Handle different error types
+      let errorMessage = 'Invalid credentials or verification required';
+      
+      if (error.response) {
+        // Server responded with error
+        errorMessage = error.response.data?.message || error.response.data?.error?.message || errorMessage;
+      } else if (error.request) {
+        // Request made but no response (network error)
+        errorMessage = 'Unable to connect to server. Please check your connection.';
+      } else if (error.message) {
+        // Error in request setup
+        if (error.message.includes('login is not a function')) {
+          errorMessage = 'Authentication service error. Please try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast.error(errorMessage, {
         duration: 4000,
       });
       
