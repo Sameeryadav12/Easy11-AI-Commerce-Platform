@@ -49,23 +49,39 @@ app.use(morgan('combined', {
 
 // Health check
 app.get('/health', async (req: Request, res: Response) => {
+  const health: any = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    service: 'easy11-backend',
+    version: '1.0.0',
+    checks: {}
+  };
+
+  // Check database connection
   try {
-    // Check database connection
     await prisma.$queryRaw`SELECT 1`;
-    
-    res.status(200).json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      service: 'easy11-backend',
-      version: '1.0.0'
-    });
-  } catch (error) {
-    logger.error('Health check failed:', error);
-    res.status(503).json({
-      status: 'unhealthy',
-      error: 'Database connection failed'
-    });
+    health.checks.database = 'connected';
+  } catch (error: any) {
+    health.status = 'degraded';
+    health.checks.database = `error: ${error.message}`;
+    logger.warn('Database health check failed:', error.message);
   }
+
+  // Check Redis (optional)
+  try {
+    const { redis } = await import('./middleware/cache.middleware');
+    if (redis) {
+      await redis.ping();
+      health.checks.redis = 'connected';
+    } else {
+      health.checks.redis = 'not configured';
+    }
+  } catch (error: any) {
+    health.checks.redis = 'not available';
+  }
+
+  const statusCode = health.status === 'healthy' ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 // API Routes

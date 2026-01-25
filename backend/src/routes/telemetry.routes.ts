@@ -32,12 +32,20 @@ const telemetrySchema = z.object({
 
 router.post('/events', async (req, res, next) => {
   try {
-    const validated = telemetrySchema.parse({
+    const payload = {
       ...req.body,
       timestamp: req.body.timestamp || new Date().toISOString(),
-    });
+    };
+    
+    const validated = telemetrySchema.parse(payload);
+    
+    // Ensure timestamp is always a string for TelemetryPayload
+    const telemetryPayload = {
+      ...validated,
+      timestamp: validated.timestamp || new Date().toISOString(),
+    };
 
-    const result = await publishTelemetryEvent(validated);
+    const result = await publishTelemetryEvent(telemetryPayload);
 
     res.status(result.queued ? 202 : 503).json({
       status: result.queued ? 'queued' : 'failed',

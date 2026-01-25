@@ -40,7 +40,7 @@ router.post('/models/promote', ...mlOpsAuth, async (req: AuthRequest, res, next)
     });
 
     // Clear recommendation cache to force refresh
-    const keysCleared = await redis.del('cache:/api/v1/recommendations/*');
+    const keysCleared = redis ? await redis.del('cache:/api/v1/recommendations/*') : 0;
 
     // In production, this would call MLflow API to update model alias
     // const mlflowResponse = await fetch(`${ML_SERVICE}/mlflow/models/promote`, { ... });
@@ -91,7 +91,9 @@ router.post('/models/rollback', ...mlOpsAuth, async (req: AuthRequest, res, next
     });
 
     // Clear cache
-    await redis.del('cache:/api/v1/recommendations/*');
+    if (redis) {
+      await redis.del('cache:/api/v1/recommendations/*');
+    }
 
     res.json({
       success: true,
@@ -172,6 +174,17 @@ router.get('/models/status', ...mlOpsAuth, async (req: AuthRequest, res, next) =
  */
 router.get('/cache/stats', ...mlOpsAuth, async (req: AuthRequest, res, next) => {
   try {
+    if (!redis) {
+      return res.json({
+        totalKeys: 0,
+        hits: 0,
+        misses: 0,
+        hitRate: 0,
+        memory: 'N/A',
+        message: 'Redis not available'
+      });
+    }
+
     const info = await redis.info('stats');
     const dbsize = await redis.dbsize();
 

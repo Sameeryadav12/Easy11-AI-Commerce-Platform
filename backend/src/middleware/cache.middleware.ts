@@ -2,15 +2,41 @@ import { Request, Response, NextFunction } from 'express';
 import Redis from 'ioredis';
 import { logger } from '../utils/logger';
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+// Create Redis client with connection error handling
+let redis: Redis | null = null;
 
-redis.on('error', (err) => {
-  logger.error('Redis connection error:', err);
-});
+try {
+  redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+    retryStrategy: (times) => {
+      // Don't retry, just log and continue without cache
+      if (times > 1) {
+        logger.warn('Redis connection failed, continuing without cache');
+        return null; // Stop retrying
+      }
+      return Math.min(times * 50, 2000);
+    },
+    maxRetriesPerRequest: 1,
+    lazyConnect: true,
+  });
 
-redis.on('connect', () => {
-  logger.info('✅ Connected to Redis');
-});
+  redis.on('error', (err) => {
+    logger.warn('Redis connection error (continuing without cache):', err.message);
+    redis = null; // Disable cache on error
+  });
+
+  redis.on('connect', () => {
+    logger.info('✅ Connected to Redis');
+  });
+
+  // Try to connect, but don't fail if it doesn't work
+  redis.connect().catch(() => {
+    logger.warn('Redis not available, continuing without cache');
+    redis = null;
+  });
+} catch (error) {
+  logger.warn('Redis initialization failed, continuing without cache:', error);
+  redis = null;
+}
 
 /**
  * Cache middleware for GET requests
@@ -20,6 +46,11 @@ export const cacheMiddleware = (ttlSeconds: number = 300) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     // Only cache GET requests
     if (req.method !== 'GET') {
+      return next();
+    }
+
+    // If Redis is not available, skip caching
+    if (!redis) {
       return next();
     }
 
@@ -46,10 +77,12 @@ export const cacheMiddleware = (ttlSeconds: number = 300) => {
 
       // Override res.json to cache the response
       res.json = function (body: any) {
-        // Cache the response
-        redis.setex(cacheKey, ttlSeconds, JSON.stringify(body)).catch((err) => {
-          logger.error('Failed to cache response', { error: err.message });
-        });
+        // Cache the response if Redis is available
+        if (redis) {
+          redis.setex(cacheKey, ttlSeconds, JSON.stringify(body)).catch((err) => {
+            logger.error('Failed to cache response', { error: err.message });
+          });
+        }
 
         // Call original json method
         return originalJson(body);
@@ -68,6 +101,10 @@ export const cacheMiddleware = (ttlSeconds: number = 300) => {
  * Clear cache by pattern
  */
 export const clearCache = async (pattern: string): Promise<number> => {
+  if (!redis) {
+    return 0;
+  }
+  
   try {
     const keys = await redis.keys(pattern);
     
@@ -89,6 +126,10 @@ export const clearCache = async (pattern: string): Promise<number> => {
  * Cache statistics
  */
 export const getCacheStats = async () => {
+  if (!redis) {
+    return null;
+  }
+  
   try {
     const info = await redis.info('stats');
     const lines = info.split('\r\n');

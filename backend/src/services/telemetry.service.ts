@@ -9,6 +9,11 @@ let producer: Producer | null = null;
 let isConnecting = false;
 
 async function getProducer() {
+  // If Kafka is disabled or not available, return null gracefully
+  if (process.env.KAFKA_ENABLED === 'false' || !process.env.KAFKA_BROKERS) {
+    return null;
+  }
+
   if (producer) {
     return producer;
   }
@@ -36,8 +41,8 @@ async function getProducer() {
 
     await producer.connect();
     logger.info(`[telemetry] Connected to Kafka brokers: ${brokers.join(', ')}`);
-  } catch (error) {
-    logger.error('[telemetry] Failed to connect to Kafka', error);
+  } catch (error: any) {
+    logger.warn('[telemetry] Kafka not available, continuing without Kafka (events logged locally only):', error.message);
     producer = null;
   } finally {
     isConnecting = false;
