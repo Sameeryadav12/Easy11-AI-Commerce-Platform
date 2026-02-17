@@ -42,6 +42,7 @@ Single entry point for all Easy11 Commerce Intelligence Platform documentation. 
 | [Deployment](./deployment.md) | Production deployment |
 | [Deployment guide (Vercel/Render/Neon)](./DEPLOYMENT_GUIDE.md) | Deploy customer site, API, and DB; demo flow; diagram |
 | [Deployment target](./DEPLOYMENT_TARGET.md) | Phase 0: Vercel SPA, Render API, Neon DB |
+| [Push to GitHub](./PUSH_TO_GITHUB.md) | Step-by-step: push this repo to GitHub. |
 | [DSA notes](./dsa.md) | Algorithms and data structures used in the platform |
 
 ---
