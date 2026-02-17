@@ -6,12 +6,16 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Bell, Check, CheckCheck, Trash2, Settings, Package, Heart, AlertCircle, Star } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { useNotificationStore } from '../../store/notificationStore';
 import dashboardAPI from '../../services/dashboardAPI';
 import { Button } from '../../components/ui';
+import BreadcrumbBack from '../../components/navigation/BreadcrumbBack';
 import toast from 'react-hot-toast';
 
 export default function NotificationsPage() {
+  const [searchParams] = useSearchParams();
+  const fromProfile = searchParams.get('from') === 'profile';
   const { notifications, unreadCount, preferences, setNotifications, setPreferences, markAsRead, markAllAsRead, deleteNotification } = useNotificationStore();
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'notifications' | 'preferences'>('notifications');
@@ -96,6 +100,16 @@ export default function NotificationsPage() {
   return (
     <div className="container-custom py-8">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="mb-4">
+          <Link
+            to="/account/profile"
+            className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Profile &amp; Security
+          </Link>
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>

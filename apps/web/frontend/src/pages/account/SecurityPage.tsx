@@ -5,7 +5,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Shield,
@@ -15,23 +16,37 @@ import {
   Monitor,
   Clock,
   MapPin,
-  X,
-  Edit2,
   Plus,
   AlertCircle,
 } from 'lucide-react';
 import { useMFAStore } from '../../store/mfaStore';
 import mfaAPI from '../../services/mfaAPI';
-import { getRelativeTime, getFactorIcon, getFactorName } from '../../utils/mfaUtils';
+import { getRelativeTime, getFactorIcon, getFactorName, formatDateTime } from '../../utils/mfaUtils';
 import { Button } from '../../components/ui';
+import BreadcrumbBack from '../../components/navigation/BreadcrumbBack';
 import toast from 'react-hot-toast';
 
 export default function SecurityPage() {
   const navigate = useNavigate();
-  const { status, devices, sessions, setDevices, setSessions, removeDevice, removeSession, fetchStatus } =
-    useMFAStore();
+  const [searchParams] = useSearchParams();
+  const fromParam = searchParams.get('from');
+  const fromSupport = fromParam === 'support' || fromParam === 'account-support';
+  const parentLabel = fromSupport ? 'Support' : 'Profile';
+  const parentUrl = fromSupport ? (fromParam === 'account-support' ? '/account/support' : '/support') : '/account/profile';
+  const {
+    status,
+    devices,
+    sessions,
+    setDevices,
+    setSessions,
+    removeDevice,
+    removeSession,
+    fetchStatus,
+  } = useMFAStore();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [revokeDeviceModal, setRevokeDeviceModal] = useState<{ deviceId: string; label: string } | null>(null);
+  const [revokingAll, setRevokingAll] = useState(false);
 
   useEffect(() => {
     loadSecurityData();
@@ -58,27 +73,47 @@ export default function SecurityPage() {
     navigate('/auth/mfa/enroll');
   };
 
-  const handleRevokeDevice = async (deviceId: string) => {
-    if (!confirm('Revoke this device? All sessions on this device will be signed out.')) return;
+  const handleRevokeDeviceClick = (device: { id: string; label: string }) => {
+    setRevokeDeviceModal({ deviceId: device.id, label: device.label });
+  };
 
+  const handleRevokeDeviceConfirm = async () => {
+    if (!revokeDeviceModal) return;
     try {
-      await removeDevice(deviceId);
-      toast.success('Device revoked successfully');
-      loadSecurityData(); // Reload
+      await mfaAPI.revokeDevice(revokeDeviceModal.deviceId);
+      await removeDevice(revokeDeviceModal.deviceId);
+      setRevokeDeviceModal(null);
+      toast.success('Device removed successfully');
     } catch (error) {
       toast.error('Failed to revoke device');
     }
   };
 
   const handleRevokeSession = async (sessionId: string) => {
-    if (!confirm('Sign out this session?')) return;
-
     try {
+      await mfaAPI.revokeSession(sessionId);
       await removeSession(sessionId);
       toast.success('Session signed out');
-      loadSecurityData(); // Reload
     } catch (error) {
       toast.error('Failed to sign out session');
+    }
+  };
+
+  const handleRevokeAllOtherSessions = async () => {
+    const others = sessions.filter((s) => !s.is_current);
+    if (others.length === 0) {
+      toast.success('No other sessions to sign out');
+      return;
+    }
+    setRevokingAll(true);
+    try {
+      await Promise.all(others.map((s) => mfaAPI.revokeSession(s.id)));
+      setSessions(sessions.filter((s) => s.is_current));
+      toast.success(`Signed out ${others.length} session${others.length > 1 ? 's' : ''}`);
+    } catch (error) {
+      toast.error('Failed to sign out sessions');
+    } finally {
+      setRevokingAll(false);
     }
   };
 
@@ -94,6 +129,13 @@ export default function SecurityPage() {
   const mfaFactorCount =
     (status?.factors.webauthn || 0) + (status?.factors.totp || 0) + (status?.factors.sms || 0);
 
+  /** Mask IP for consumer apps: 203.123.45.67 → 203.123.xx.xx */
+  const maskIP = (ip: string) => {
+    const parts = ip.split('.');
+    if (parts.length !== 4) return ip;
+    return `${parts[0]}.${parts[1]}.xx.xx`;
+  };
+
   return (
     <div className="container-custom py-8">
       <motion.div
@@ -101,6 +143,14 @@ export default function SecurityPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
+        <div className="mb-4">
+          <BreadcrumbBack
+            parentLabel={parentLabel}
+            parentUrl={parentUrl}
+            currentPage="Security"
+          />
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -265,22 +315,26 @@ export default function SecurityPage() {
                               <Clock className="w-3 h-3" />
                               Last seen: {getRelativeTime(device.last_seen)}
                             </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              Last activity: {formatDateTime(device.last_seen)}
+                            </p>
                             <p className="flex items-center gap-1">
                               <MapPin className="w-3 h-3" />
-                              {device.last_location} • {device.last_ip}
+                              {device.last_location} • {maskIP(device.last_ip)}
                             </p>
                           </div>
                         </div>
                       </div>
                       <div className="flex gap-2 ml-2">
                         {!device.is_current && (
-                          <button
-                            onClick={() => handleRevokeDevice(device.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                            aria-label="Revoke device"
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleRevokeDeviceClick(device)}
+                            className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
                           >
-                            <X className="w-4 h-4" />
-                          </button>
+                            Remove
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -302,9 +356,22 @@ export default function SecurityPage() {
                 <Clock className="w-6 h-6 text-teal-500" />
                 Active Sessions
               </h2>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+                </span>
+                {sessions.some((s) => !s.is_current) && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleRevokeAllOtherSessions}
+                    disabled={revokingAll}
+                    className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+                  >
+                    {revokingAll ? 'Signing out...' : 'Sign out all other sessions'}
+                  </Button>
+                )}
+              </div>
             </div>
 
             {sessions.length === 0 ? (
@@ -340,11 +407,14 @@ export default function SecurityPage() {
                         <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                           <p>Created: {getRelativeTime(session.created_at)}</p>
                           <p>Last seen: {getRelativeTime(session.last_seen)}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-500">
+                            Last activity: {formatDateTime(session.last_seen)}
+                          </p>
                           <p className="flex items-center gap-1">
                             <MapPin className="w-3 h-3" />
-                            {session.last_location} • {session.last_ip}
+                            {session.last_location} • {maskIP(session.last_ip)}
                           </p>
-                          {session.mfa_completed_at && (
+                          {mfaEnabled && session.mfa_completed_at && (
                             <p className="text-green-600 dark:text-green-400">
                               ✓ MFA verified {getRelativeTime(session.mfa_completed_at)}
                             </p>
@@ -352,13 +422,14 @@ export default function SecurityPage() {
                         </div>
                       </div>
                       {!session.is_current && (
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => handleRevokeSession(session.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors ml-2"
-                          aria-label="Sign out session"
+                          className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
                         >
-                          <X className="w-4 h-4" />
-                        </button>
+                          Sign out this device
+                        </Button>
                       )}
                     </div>
                   </motion.div>
@@ -380,6 +451,56 @@ export default function SecurityPage() {
             </div>
           </motion.div>
         </div>
+
+        {/* Remove Device Confirmation Modal */}
+        <AnimatePresence>
+          {revokeDeviceModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+              onClick={() => setRevokeDeviceModal(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.9 }}
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex gap-3 mb-6">
+                  <AlertCircle className="w-10 h-10 text-red-500 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-xl font-heading font-bold text-gray-900 dark:text-white">
+                      Remove this trusted device?
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">
+                      Remove &quot;{revokeDeviceModal.label}&quot; from trusted devices? You may be asked for
+                      verification next time you sign in from this device.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setRevokeDeviceModal(null)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handleRevokeDeviceConfirm}
+                    className="flex-1 bg-red-500 hover:bg-red-600"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

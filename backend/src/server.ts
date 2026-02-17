@@ -20,6 +20,9 @@ import adminRoutes from './routes/admin.routes';
 import mlopsRoutes from './routes/mlops.routes';
 import exportRoutes from './routes/export.routes';
 import telemetryRoutes from './routes/telemetry.routes';
+import debugRoutes from './routes/debug.routes';
+import supportRoutes from './routes/support.routes';
+import rewardsRoutes from './routes/rewards.routes';
 
 // Load environment variables
 dotenv.config();
@@ -33,11 +36,21 @@ export const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error'] : ['error']
 });
 
+// Allowed CORS origins (comma-separated in FRONTEND_URL, or single value)
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+if (!allowedOrigins.length) allowedOrigins.push('http://localhost:3000');
+
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(null, false);
+  },
+  credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -95,6 +108,9 @@ app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/mlops', mlopsRoutes);
 app.use('/api/v1/export', exportRoutes);
 app.use('/api/v1/telemetry', telemetryRoutes);
+app.use('/api/v1/__debug', debugRoutes);
+app.use('/api/v1/support', supportRoutes);
+app.use('/api/v1/rewards', rewardsRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {

@@ -22,6 +22,7 @@ import {
  */
 export default function AccessibilityPage() {
   const lastUpdated = 'January 15, 2025';
+  const lastAuditDate = 'January 2025';
 
   const features = [
     {
@@ -32,7 +33,7 @@ export default function AccessibilityPage() {
     },
     {
       title: 'Screen Reader Support',
-      description: 'Compatible with screen readers including JAWS, NVDA, VoiceOver, and TalkBack. Proper ARIA labels and semantic HTML throughout.',
+      description: 'Designed to support screen readers including JAWS, NVDA, VoiceOver, and TalkBack. Proper ARIA labels and semantic HTML throughout.',
       icon: Ear,
       color: 'green',
     },
@@ -65,14 +66,14 @@ export default function AccessibilityPage() {
   const standards = [
     {
       level: 'WCAG 2.1 Level AA',
-      status: 'Compliant',
-      description: 'We strive to meet or exceed WCAG 2.1 Level AA standards across all pages and features.',
+      status: 'Striving',
+      description: 'We strive to meet WCAG 2.1 Level AA standards across all pages and features. We conduct regular audits and address issues as identified.',
       icon: CheckCircle,
     },
     {
       level: 'Section 508',
-      status: 'Compliant',
-      description: 'Our website complies with Section 508 of the Rehabilitation Act for federal accessibility requirements.',
+      status: 'Striving',
+      description: 'We strive to meet Section 508 of the Rehabilitation Act requirements for federal accessibility.',
       icon: CheckCircle,
     },
     {
@@ -168,6 +169,8 @@ Our goal is to conform to the Web Content Accessibility Guidelines (WCAG) 2.1 Le
 - Continuous monitoring and improvements
 - Feedback integration from users
 
+**Last Accessibility Audit:** ${lastAuditDate}
+
 If you encounter any accessibility barriers, please contact us so we can address them.`,
     },
     {
@@ -186,7 +189,7 @@ If you encounter any accessibility barriers, please contact us so we can address
 - The assistive technology you were using
 - Your contact information (if you'd like a response)
 
-We aim to respond to accessibility feedback within 5 business days.`,
+We aim to respond to accessibility feedback as quickly as possible.`,
     },
     {
       id: 'third-party',
@@ -265,11 +268,15 @@ We are committed to providing accessible customer service and will work with you
             <div className="mt-6 flex items-center justify-center gap-4 text-blue-100 text-sm">
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4" />
-                <span>WCAG 2.1 AA Compliant</span>
+                <span>We strive to meet WCAG 2.1 Level AA standards</span>
               </div>
               <div className="flex items-center gap-2">
                 <Info className="w-4 h-4" />
                 <span>Last Updated: {lastUpdated}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                <span>Last tested: {lastAuditDate}</span>
               </div>
             </div>
           </motion.div>

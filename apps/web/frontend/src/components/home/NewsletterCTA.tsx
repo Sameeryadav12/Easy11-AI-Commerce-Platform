@@ -86,20 +86,20 @@ export const NewsletterCTA: React.FC = () => {
 
           {/* Headline */}
           <h2 className="text-4xl lg:text-5xl font-heading font-bold text-white mb-4">
-            Join Easy11 Rewards
+            Stay in the loop
           </h2>
           
           {/* Subheadline */}
           <div className="flex items-center justify-center space-x-2 mb-6">
             <Sparkles className="w-5 h-5 text-teal-300" />
-            <p className="text-2xl text-blue-100 font-semibold">
-              Get 10% Off Your First Order
+            <p className="text-xl text-blue-100 font-semibold">
+              10% off your first order when you subscribe
             </p>
             <Sparkles className="w-5 h-5 text-teal-300" />
           </div>
 
           <p className="text-lg text-blue-100 mb-8">
-            Plus exclusive deals, new arrivals, and AI-powered product recommendations delivered to your inbox
+            Deals, new arrivals, and picks you might like—delivered to your inbox.
           </p>
 
           {/* Email Form */}
@@ -180,7 +180,7 @@ export const NewsletterCTA: React.FC = () => {
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3">
                 <Mail className="w-6 h-6" />
               </div>
-              <p className="font-semibold">AI Recommendations</p>
+              <p className="font-semibold">Curated picks</p>
             </div>
           </motion.div>
         </motion.div>

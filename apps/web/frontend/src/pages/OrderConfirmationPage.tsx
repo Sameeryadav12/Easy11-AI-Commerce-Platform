@@ -268,11 +268,11 @@ export default function OrderConfirmationPage() {
                       {item.name}
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Quantity: {item.quantity}
+                      Quantity: {Number(item.quantity) || 1}
                     </p>
                   </div>
                   <p className="font-bold text-gray-900 dark:text-white">
-                    ${(item.price * item.quantity).toFixed(2)}
+                    ${((Number(item.price) || 0) * (Number(item.quantity) || 1)).toFixed(2)}
                   </p>
                 </div>
               ))}

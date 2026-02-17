@@ -63,7 +63,7 @@ export default function VerifyEmailPage() {
 
         // Auto-redirect after 2 seconds
         setTimeout(() => {
-          navigate('/account', { replace: true });
+          navigate('/', { replace: true });
         }, 2000);
       } catch (error: any) {
         if (error.code === 'TOKEN_EXPIRED') {

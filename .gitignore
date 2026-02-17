@@ -86,8 +86,7 @@ ehthumbs.db
 Thumbs.db
 Desktop.ini
 
-# Prisma
-backend/prisma/migrations/
+# Prisma (keep migrations/ in repo for deploy)
 *.prisma.bak
 
 # ML

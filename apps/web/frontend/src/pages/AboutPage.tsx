@@ -9,7 +9,15 @@ import {
   TrendingUp,
   Globe,
   Lightbulb,
-  Rocket
+  Rocket,
+  Building2,
+  Mail,
+  MapPin,
+  Phone,
+  Lock,
+  RefreshCw,
+  CheckCircle,
+  Newspaper
 } from 'lucide-react';
 
 /**
@@ -112,7 +120,7 @@ export default function AboutPage() {
               About Easy11
             </h1>
             <p className="text-xl text-blue-100 mb-8">
-              Revolutionizing e-commerce through AI-powered personalization, voice commerce, and innovative shopping experiences.
+              Building a smarter, secure, and customer-focused commerce platform powered by AI.
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-blue-100">
               <div className="flex items-center gap-2">
@@ -162,6 +170,50 @@ export default function AboutPage() {
                 we're shaping the future of how people discover, explore, and purchase products online.
               </p>
             </div>
+
+            {/* Trust Stats Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.15 }}
+                className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 text-center"
+              >
+                <Globe className="w-10 h-10 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">18+</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Countries Served</p>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
+                className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 text-center"
+              >
+                <Users className="w-10 h-10 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">12,000+</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Active Customers</p>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.25 }}
+                className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 text-center"
+              >
+                <Award className="w-10 h-10 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">250+</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Verified Vendors</p>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.3 }}
+                className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 text-center"
+              >
+                <Zap className="w-10 h-10 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">4.8</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Customer Rating</p>
+              </motion.div>
+            </div>
           </motion.div>
         </section>
 
@@ -183,9 +235,9 @@ export default function AboutPage() {
                 </h3>
               </div>
               <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                To democratize intelligent commerce by making AI-powered shopping accessible to everyone, 
-                while building a sustainable, ethical, and customer-centric platform that transforms how 
-                people discover and purchase products online.
+                To democratize intelligent commerce through ethical commerce, transparent marketplace practices, 
+                and seller accountability. We make AI-powered shopping accessible to everyone while ensuring 
+                fair pricing, sustainable operations, and a customer-centric platform.
               </p>
             </motion.div>
 
@@ -204,9 +256,9 @@ export default function AboutPage() {
                 </h3>
               </div>
               <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                To become the world's most trusted and innovative e-commerce platform, where AI and human 
-                creativity work together to deliver unparalleled shopping experiences that are personalized, 
-                sustainable, and accessible to all.
+                To become a trusted, innovative e-commerce platform where AI and human creativity work together 
+                for ethical commerce, transparent operations, and fair treatment of both buyers and sellers. 
+                We aim to deliver personalized, sustainable, and accessible shopping experiences.
               </p>
             </motion.div>
           </div>
@@ -316,8 +368,8 @@ export default function AboutPage() {
                   <div key={index} className="relative flex gap-6">
                     {/* Timeline Dot */}
                     <div className="relative z-10 flex-shrink-0">
-                      <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-lg">
-                        {milestone.year.slice(-2)}
+                      <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                        {milestone.year}
                       </div>
                     </div>
 
@@ -333,6 +385,121 @@ export default function AboutPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </motion.div>
+        </section>
+
+        {/* Buyer Protection */}
+        <section className="mb-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.85 }}
+            className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700"
+          >
+            <h2 className="text-4xl font-heading font-bold text-gray-900 dark:text-white mb-6 text-center flex items-center justify-center gap-2">
+              <Shield className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+              Our Buyer Protection Promise
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 text-center mb-8 max-w-2xl mx-auto">
+              Shop with confidence. We stand behind every purchase on Easy11.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="flex gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <RefreshCw className="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">30-Day Return Guarantee</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Return eligible items within 30 days for a full refund.</p>
+                </div>
+              </div>
+              <div className="flex gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <Lock className="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Secure Payment & SSL Checkout</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Encrypted checkout and PCI-DSS compliant payment processing.</p>
+                </div>
+              </div>
+              <div className="flex gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">5–7 Day Refund Processing</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Refunds processed within 5–7 business days of approval.</p>
+                </div>
+              </div>
+              <div className="flex gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 md:col-span-2 lg:col-span-1">
+                <Shield className="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Verified Vendor Policy</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">All vendors are verified to maintain marketplace quality.</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </section>
+
+        {/* Meet the Founders */}
+        <section className="mb-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.88 }}
+          >
+            <h2 className="text-4xl font-heading font-bold text-gray-900 dark:text-white mb-12 text-center">
+              Meet the Founders
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 text-center">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold">
+                  O
+                </div>
+                <h3 className="text-xl font-heading font-bold text-gray-900 dark:text-white mb-2">Ocean</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-2">
+                  Co-founder and technologist focused on building scalable, ethical commerce infrastructure. 
+                  Passionate about making AI work for everyday shoppers.
+                </p>
+                <p className="text-gray-500 dark:text-gray-500 text-xs italic">
+                  Why Easy11: "We wanted to build a marketplace that treats both buyers and sellers fairly."
+                </p>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 text-center">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold">
+                  S
+                </div>
+                <h3 className="text-xl font-heading font-bold text-gray-900 dark:text-white mb-2">Sameer</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-2">
+                  Co-founder and product lead driving customer experience and marketplace trust. 
+                  Believes in transparent, sustainable commerce.
+                </p>
+                <p className="text-gray-500 dark:text-gray-500 text-xs italic">
+                  Why Easy11: "We started Easy11 to create a smarter, more trustworthy way to shop online."
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </section>
+
+        {/* Media & Press */}
+        <section className="mb-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.9 }}
+            className="bg-gray-100 dark:bg-gray-800/50 p-8 rounded-xl border border-gray-200 dark:border-gray-700 text-center"
+          >
+            <h2 className="text-3xl font-heading font-bold text-gray-900 dark:text-white mb-4 flex items-center justify-center gap-2">
+              <Newspaper className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              Featured & Partners
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-2xl mx-auto">
+              Easy11 partners with verified payment providers and is committed to industry-standard security.
+            </p>
+            <div className="flex flex-wrap justify-center gap-6 text-gray-500 dark:text-gray-400">
+              <span className="px-4 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium">
+                PCI-DSS Compliant Payments
+              </span>
+              <span className="px-4 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium">
+                Partnered with Verified Gateways
+              </span>
             </div>
           </motion.div>
         </section>
@@ -366,6 +533,50 @@ export default function AboutPage() {
             </a>
           </div>
         </motion.div>
+
+        {/* Company Information - Legal entity transparency */}
+        <section className="mt-20 mb-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.95 }}
+            className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700"
+          >
+            <h2 className="text-2xl font-heading font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+              <Building2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              Company Information
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-700 dark:text-gray-300">
+              <div className="space-y-3">
+                <p className="font-semibold text-gray-900 dark:text-white">Easy11 Commerce Pty Ltd</p>
+                <p>Registered in Australia</p>
+                <p>ABN: XX XXX XXX XXX</p>
+                <p className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-gray-500" />
+                  Melbourne, Victoria
+                </p>
+              </div>
+              <div className="space-y-3">
+                <p className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-gray-500" />
+                  <a href="mailto:support@easy11.com" className="text-blue-600 dark:text-blue-400 hover:underline">
+                    support@easy11.com
+                  </a>
+                </p>
+                <p className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-gray-500" />
+                  Support: Available via contact form
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-400 flex flex-wrap items-center gap-2">
+                <Shield className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                Easy11 complies with GDPR and CCPA data protection standards. All payments are processed through PCI-DSS compliant gateways.
+              </p>
+            </div>
+          </motion.div>
+        </section>
       </div>
     </div>
   );

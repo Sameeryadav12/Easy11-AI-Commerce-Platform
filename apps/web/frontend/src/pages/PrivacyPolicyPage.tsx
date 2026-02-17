@@ -79,6 +79,65 @@ export default function PrivacyPolicyPage() {
 However, no method of transmission over the Internet or electronic storage is 100% secure. While we strive to use commercially acceptable means to protect your information, we cannot guarantee absolute security.`,
     },
     {
+      id: 'legal-basis',
+      title: 'Legal Basis for Processing (GDPR)',
+      content: `For individuals in the European Economic Area (EEA) and UK, we process your personal data based on the following legal bases under the General Data Protection Regulation (GDPR):
+
+**Contract:** Processing necessary to perform our contract with you (e.g., order fulfillment, account management).
+
+**Legitimate Interests:** Processing for our legitimate business interests (e.g., fraud prevention, service improvement), where such interests are not overridden by your rights.
+
+**Consent:** Where you have given clear consent for specific processing (e.g., marketing, non-essential cookies).
+
+**Legal Obligation:** Processing required to comply with applicable law.
+
+**Vital Interests:** Processing necessary to protect your vital interests or those of another person.
+
+You may withdraw consent at any time. Withdrawal does not affect the lawfulness of processing before withdrawal.`,
+    },
+    {
+      id: 'data-protection-officer',
+      title: 'Data Protection Officer',
+      content: `For questions about our data practices, GDPR compliance, or to exercise your rights, you may contact our Data Protection Officer (DPO) at:
+
+**Email:** dpo@easy11.com
+**Privacy Team:** privacy@easy11.com
+
+Our DPO handles inquiries related to data protection, privacy rights, and regulatory compliance.`,
+    },
+    {
+      id: 'ccpa-rights',
+      title: 'California Consumer Privacy Rights (CCPA)',
+      content: `If you are a California resident, the California Consumer Privacy Act (CCPA) grants you additional rights:
+
+**Right to Know:** You can request disclosure of the categories and specific pieces of personal information we have collected about you.
+
+**Right to Delete:** You can request deletion of your personal information, subject to certain exceptions.
+
+**Right to Opt-Out of Sale or Sharing:** We do not sell your personal information. You can opt out of "sharing" for cross-context behavioral advertising via our "Do Not Sell or Share My Personal Information" link in the footer.
+
+**Right to Correct:** You can request correction of inaccurate personal information.
+
+**Right to Non-Discrimination:** We will not discriminate against you for exercising your CCPA rights.
+
+To exercise these rights, contact us at privacy@easy11.com or use the privacy controls in your account. We will verify your identity before processing requests.`,
+    },
+    {
+      id: 'australia-privacy',
+      title: 'Australia Privacy Act',
+      content: `Easy11 operates in Australia and complies with the Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs).
+
+**Collection:** We collect personal information only as reasonably necessary for our functions and activities, and by lawful and fair means.
+
+**Use and Disclosure:** We use and disclose personal information only for the primary purpose of collection or for related purposes you would reasonably expect.
+
+**Data Quality and Security:** We take reasonable steps to ensure personal information is accurate, complete, and up to date, and protected from misuse, loss, and unauthorized access.
+
+**Access and Correction:** You have the right to access and correct your personal information. Contact us at privacy@easy11.com.
+
+**Complaints:** If you have a privacy complaint, contact us first. If you are not satisfied, you may lodge a complaint with the Office of the Australian Information Commissioner (OAIC).`,
+    },
+    {
       id: 'your-rights',
       title: 'Your Privacy Rights',
       content: `Depending on your location, you may have certain rights regarding your personal information:
@@ -146,8 +205,9 @@ Factors we consider when determining retention periods include:
       content: `If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:
 
 **Email:** privacy@easy11.com
-**Phone:** 1-800-EASY-11
-**Address:** 123 Commerce Street, San Francisco, CA 94105, United States
+**Support:** support@easy11.com
+**Legal:** legal@easy11.com
+**Address:** Melbourne, Victoria, Australia
 
 For EU residents, you also have the right to lodge a complaint with your local data protection authority.`,
     },

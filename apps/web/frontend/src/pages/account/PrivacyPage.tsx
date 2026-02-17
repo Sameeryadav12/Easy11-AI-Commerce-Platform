@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Download, Trash2, AlertTriangle, Shield, FileText, Lock } from 'lucide-react';
+import { Download, Trash2, AlertTriangle, Shield, FileText, Lock, Info } from 'lucide-react';
 import dashboardAPI from '../../services/dashboardAPI';
 import StepUpModal from '../../components/mfa/StepUpModal';
 import { Button } from '../../components/ui';
@@ -30,7 +30,7 @@ export default function PrivacyPage() {
     updateSettings: state.updateSettings,
   }));
   const [allowPersonalization, setAllowPersonalization] = useState(true);
-  const [explorationRatio, setExplorationRatio] = useState(0.15);
+  const [explorationRatio, setExplorationRatio] = useState(0.25);
 
   useEffect(() => {
     loadSettings();
@@ -48,7 +48,7 @@ export default function PrivacyPage() {
       mutedBrands: [],
       mutedCategories: [],
       allowExploration: true,
-      explorationRatio: 0.15,
+      explorationRatio: 0.25,
     };
     updateSettings({
       ...base,
@@ -137,7 +137,7 @@ export default function PrivacyPage() {
               <p className="text-gray-600 dark:text-gray-300 mb-4">
                 Download a copy of all your personal data, orders, and activity. The export includes:
               </p>
-              <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300 mb-6">
+              <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300 mb-4">
                 <li className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-gray-400" />
                   Account information and profile data
@@ -155,6 +155,9 @@ export default function PrivacyPage() {
                   Addresses and payment methods (tokenized)
                 </li>
               </ul>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                You&apos;ll receive an email when your export is ready. Exports may take up to 24 hours.
+              </p>
 
               {exportRequest && exportRequest.status === 'completed' && (
                 <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-xl p-4">
@@ -235,13 +238,25 @@ export default function PrivacyPage() {
                   />
                 </label>
 
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl space-y-3">
+                <div
+                  className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl space-y-3"
+                  title="Controls how much of your recommendations are personalized vs. fresh discoveries. Higher = more variety."
+                >
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Exploration ratio</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Keeps 10–20% of slots fresh to avoid filter bubbles.
-                      </p>
+                    <div className="flex items-start gap-2">
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white flex items-center gap-1.5">
+                          Exploration ratio
+                          <Info
+                            className="w-4 h-4 text-gray-400 cursor-help"
+                            title="Controls how much of your recommendations are personalized vs. fresh discoveries. Higher = more variety to avoid filter bubbles."
+                            aria-label="Exploration ratio info"
+                          />
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Keeps 10–30% of slots fresh to avoid filter bubbles. Default: 25%.
+                        </p>
+                      </div>
                     </div>
                     <span className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-800/40 text-blue-700 dark:text-blue-200 text-xs font-semibold">
                       {Math.round(explorationRatio * 100)}% newness
@@ -249,7 +264,7 @@ export default function PrivacyPage() {
                   </div>
                   <input
                     type="range"
-                    min={0}
+                    min={0.1}
                     max={0.3}
                     step={0.05}
                     value={explorationRatio}
@@ -309,10 +324,13 @@ export default function PrivacyPage() {
                     <ul className="space-y-1 text-sm text-red-800 dark:text-red-300">
                       <li>• All your data will be permanently deleted</li>
                       <li>• Active orders will be cancelled</li>
-                      <li>• Rewards points will be forfeited</li>
+                      <li>• Unused points and tier status will be permanently lost</li>
                       <li>• This action cannot be undone</li>
                       <li>• You have 7 days to cancel the deletion</li>
                     </ul>
+                    <p className="text-xs text-red-700 dark:text-red-400 mt-3">
+                      Some transaction records may be retained for legal or tax purposes.
+                    </p>
                   </div>
                 </div>
               </div>

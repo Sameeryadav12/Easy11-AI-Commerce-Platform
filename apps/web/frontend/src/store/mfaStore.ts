@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type {
   MFAStatus,
   MFAFactor,
@@ -17,6 +17,7 @@ import type {
   RecoveryCodes,
   MFAEnrollmentState,
 } from '../types/mfa';
+import { userScopedStorage } from './userScopedStorage';
 
 interface MFAState {
   // MFA Status
@@ -370,7 +371,8 @@ export const useMFAStore = create<MFAState>()(
     }),
     {
       name: 'easy11-mfa',
-      getStorage: () => localStorage,
+      storage: createJSONStorage(() => userScopedStorage),
+      skipHydration: true,
       // Only persist non-sensitive data
       partialize: (state) => ({
         status: state.status,

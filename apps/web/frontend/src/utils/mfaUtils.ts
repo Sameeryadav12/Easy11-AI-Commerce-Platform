@@ -384,6 +384,24 @@ export function formatTimeRemaining(seconds: number): string {
 }
 
 /**
+ * Format date and time for "Last activity" display (e.g., "Feb 10, 2026 – 10:23 PM")
+ */
+export function formatDateTime(dateString: string): string {
+  const date = new Date(dateString);
+  const datePart = date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const timePart = date.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${datePart} – ${timePart}`;
+}
+
+/**
  * Get relative time string (e.g., "2 minutes ago", "3 hours ago")
  */
 export function getRelativeTime(dateString: string): string {
@@ -488,6 +506,7 @@ export function getFactorIcon(factor: string): string {
 // ==================== Export All ====================
 
 const mfaUtils = {
+  formatDateTime,
   getDeviceFingerprint,
   getDeviceLabel,
   assessRisk,

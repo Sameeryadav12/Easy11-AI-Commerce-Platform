@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { userScopedStorage } from './userScopedStorage';
 
 export interface CartItem {
   id: string;
@@ -27,6 +28,8 @@ interface CartState {
   openDrawer: () => void;
   closeDrawer: () => void;
   applyDiscount: (code: string) => void;
+  /** Apply a reward coupon (E11REWARD-xxx) with a dollar amount from API. */
+  applyRewardCoupon: (code: string, dollarAmount: number) => void;
   removeDiscount: () => void;
   
   // Computed values
@@ -49,20 +52,22 @@ export const useCartStore = create<CartState>()(
         set((state) => {
           const existingItem = state.items.find((i) => i.id === item.id);
           
+          const maxStock = (v: number | undefined) => (Number(v) >= 1 ? Number(v) : 999);
           if (existingItem) {
-            // Update quantity if item exists
+            const stock = maxStock(existingItem.stock);
             return {
               items: state.items.map((i) =>
                 i.id === item.id
-                  ? { ...i, quantity: Math.min(i.quantity + quantity, i.stock) }
+                  ? { ...i, quantity: Math.min((Number(i.quantity) || 1) + quantity, stock), stock: i.stock ?? stock }
                   : i
               ),
-              isDrawerOpen: true, // Open drawer when adding
+              isDrawerOpen: true,
             };
           } else {
-            // Add new item
+            const stock = maxStock(item.stock);
+            const qty = Math.min(quantity, stock);
             return {
-              items: [...state.items, { ...item, quantity: Math.min(quantity, item.stock) }],
+              items: [...state.items, { ...item, quantity: Number.isFinite(qty) ? qty : 1, stock: item.stock ?? stock }],
               isDrawerOpen: true,
             };
           }
@@ -77,11 +82,12 @@ export const useCartStore = create<CartState>()(
 
       updateQuantity: (id, quantity) => {
         set((state) => ({
-          items: state.items.map((item) =>
-            item.id === id
-              ? { ...item, quantity: Math.min(Math.max(1, quantity), item.stock) }
-              : item
-          ),
+          items: state.items.map((item) => {
+            if (item.id !== id) return item;
+            const stock = Number(item.stock) >= 1 ? Number(item.stock) : 999;
+            const qty = Math.min(Math.max(1, Number(quantity) || 1), stock);
+            return { ...item, quantity: Number.isFinite(qty) ? qty : 1 };
+          }),
         }));
       },
 
@@ -119,43 +125,60 @@ export const useCartStore = create<CartState>()(
         }
       },
 
+      applyRewardCoupon: (code, dollarAmount) => {
+        const subtotal = get().getSubtotal();
+        set({
+          discountCode: code.trim().toUpperCase(),
+          discountAmount: Math.min(Math.max(0, dollarAmount), subtotal),
+        });
+      },
+
       removeDiscount: () => {
         set({ discountCode: null, discountAmount: 0 });
       },
 
       getTotalItems: () => {
-        return get().items.reduce((sum, item) => sum + item.quantity, 0);
+        return get().items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
       },
 
       getSubtotal: () => {
-        return get().items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        return get().items.reduce(
+          (sum, item) => {
+            const price = Number(item.price) || 0;
+            const qty = Number(item.quantity);
+            const quantity = Number.isFinite(qty) && qty >= 0 ? qty : 1;
+            return sum + price * quantity;
+          },
+          0
+        );
       },
 
       getTax: () => {
         const subtotal = get().getSubtotal();
-        const discountAmount = get().discountAmount;
-        return (subtotal - discountAmount) * 0.08; // 8% tax
+        const discountAmount = Number(get().discountAmount) || 0;
+        const shipping = get().getShipping();
+        return Math.max(0, (subtotal - discountAmount + shipping) * 0.1); // 10% GST
       },
 
       getShipping: () => {
-        const subtotal = get().getSubtotal();
-        // Free shipping over $100
-        if (subtotal >= 100) return 0;
-        // Standard shipping
-        return 9.99;
+        // Standard delivery is free by default
+        return 0;
       },
 
       getTotal: () => {
         const subtotal = get().getSubtotal();
         const tax = get().getTax();
         const shipping = get().getShipping();
-        const discount = get().discountAmount;
-        return subtotal + tax + shipping - discount;
+        const discount = Number(get().discountAmount) || 0;
+        const total = subtotal + tax + shipping - discount;
+        return Number.isFinite(total) ? total : 0;
       },
     }),
     {
-      name: 'easy11-cart-storage', // localStorage key
-      partialPersist: (state) => ({
+      name: 'easy11-cart-storage',
+      storage: createJSONStorage(() => userScopedStorage),
+      skipHydration: true,
+      partialize: (state) => ({
         items: state.items,
         discountCode: state.discountCode,
         discountAmount: state.discountAmount,

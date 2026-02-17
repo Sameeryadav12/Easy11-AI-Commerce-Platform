@@ -4,8 +4,9 @@
  */
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { PaymentMethod } from '../types/dashboard';
+import { userScopedStorage } from './userScopedStorage';
 
 interface PaymentState {
   methods: PaymentMethod[];
@@ -69,7 +70,8 @@ export const usePaymentStore = create<PaymentState>()(
     }),
     {
       name: 'easy11-payments',
-      getStorage: () => localStorage,
+      storage: createJSONStorage(() => userScopedStorage),
+      skipHydration: true,
       // Only persist non-sensitive data (no card numbers, CVVs)
       partialize: (state) => ({
         methods: state.methods.map((m) => ({

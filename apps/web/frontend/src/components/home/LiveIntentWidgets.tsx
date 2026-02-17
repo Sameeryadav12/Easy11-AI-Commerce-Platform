@@ -1,26 +1,47 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Clock, ShoppingCart, TrendingUp, ArrowRight } from 'lucide-react';
 import { useRecentlyViewedStore } from '../../store/recentlyViewedStore';
 import { useCartStore } from '../../store/cartStore';
+import { useAuthStore } from '../../store/authStore';
 import { Button } from '../ui';
 
-export default function LiveIntentWidgets() {
+/** Hours after signup during which we treat the user as "new" and hide session-based widgets (business tactics: fresh start). */
+const NEW_SIGNUP_FRESH_START_HOURS = 24;
+
+interface LiveIntentWidgetsProps {
+  /** When true, render only the grid (no section/container); used inside merged "For you" area */
+  embedded?: boolean;
+}
+
+export default function LiveIntentWidgets({ embedded }: LiveIntentWidgetsProps = {}) {
+  const user = useAuthStore((state) => state.user);
   const recentProducts = useRecentlyViewedStore((state) => state.getRecent(4));
   const { items, getTotal, openDrawer } = useCartStore();
   const cartTotal = getTotal();
 
-  // Don't show if no data
-  if (recentProducts.length === 0 && items.length === 0) {
+  // Business tactics: new signups get a fresh start — don't show "Because you viewed" so they aren't
+  // shown pre-signup session data or an empty state that implies prior browsing.
+  const isNewSignup = useMemo(() => {
+    if (!user?.createdAt) return false;
+    const created = new Date(user.createdAt).getTime();
+    const cutoff = Date.now() - NEW_SIGNUP_FRESH_START_HOURS * 60 * 60 * 1000;
+    return created >= cutoff;
+  }, [user?.createdAt]);
+
+  // Only show "Because you viewed" when logged in and not a new signup (hidden for guests and new users)
+  const showBecauseYouViewed = !!user && recentProducts.length > 0 && !isNewSignup;
+
+  // Don't show if no data (and for guests/new signups we hide "Because you viewed")
+  if (!showBecauseYouViewed && items.length === 0) {
     return null;
   }
 
-  return (
-    <div className="section bg-gray-50 dark:bg-gray-900">
-      <div className="container-custom">
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Recently Viewed */}
-          {recentProducts.length > 0 && (
+  const grid = (
+    <div className="grid md:grid-cols-2 gap-6">
+          {/* Recently Viewed — hidden for new signups (fresh start; business tactics) */}
+          {showBecauseYouViewed && (
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -35,10 +56,10 @@ export default function LiveIntentWidgets() {
                   </div>
                   <div>
                     <h3 className="text-xl font-heading font-bold text-gray-900 dark:text-white">
-                      Recently Viewed
+                      Because you viewed
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Continue browsing
+                      Pick up where you left off
                     </p>
                   </div>
                 </div>
@@ -134,7 +155,14 @@ export default function LiveIntentWidgets() {
             </motion.div>
           )}
         </div>
-      </div>
+  );
+
+  if (embedded) {
+    return grid;
+  }
+  return (
+    <div className="section bg-gray-50 dark:bg-gray-900">
+      <div className="container-custom">{grid}</div>
     </div>
   );
 }

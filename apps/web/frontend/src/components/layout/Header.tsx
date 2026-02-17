@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Search, Menu, X, Camera } from 'lucide-react';
+import { ShoppingCart, User, Search, Menu, Camera, ChevronDown, LogOut } from 'lucide-react';
 import { Button } from '../ui';
 import ThemeToggle from '../ThemeToggle';
 import VisualSearch from '../search/VisualSearch';
@@ -19,8 +19,20 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuToggle }) => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isVisualSearchOpen, setIsVisualSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
 
-  const cartItemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const cartItemCount = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -64,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuToggle }) => {
                 Easy11
               </h1>
               <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
-                AI Commerce
+                Commerce
               </p>
             </div>
           </Link>
@@ -89,15 +101,15 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuToggle }) => {
                   onBlur={() => setIsSearchFocused(false)}
                 />
               </div>
-              {/* Visual Search Button */}
+              {/* Image search - subtle, no label */}
               <button
                 type="button"
                 onClick={() => setIsVisualSearchOpen(true)}
-                className="p-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 rounded-xl text-white transition-all shadow-md hover:shadow-lg group"
-                aria-label="Visual search"
+                className="p-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                aria-label="Search by image"
                 title="Search by image"
               >
-                <Camera className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                <Camera className="w-5 h-5" />
               </button>
               {/* Search Submit Button */}
               <button
@@ -135,8 +147,8 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuToggle }) => {
             {/* Theme Toggle */}
             <ThemeToggle />
 
-            {/* Voice Commerce */}
-            <div className="hidden md:block">
+            {/* Voice - icon-only on desktop to reduce clutter */}
+            <div className="hidden md:block [&_.voice-label]:hidden">
               <VoiceCommandButton />
             </div>
 
@@ -154,18 +166,45 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuToggle }) => {
               )}
             </button>
 
-            {/* User Menu */}
+            {/* User: dropdown with My Account + Logout (logout not at top level) */}
             {user ? (
-              <div className="hidden lg:flex items-center space-x-3">
-                <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+              <div className="hidden lg:block relative" ref={accountRef}>
+                <button
+                  type="button"
+                  onClick={() => setAccountOpen((o) => !o)}
+                  className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-600"
+                  aria-label="Account menu"
+                  aria-expanded={accountOpen}
+                >
                   <User className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 max-w-[120px] truncate">
                     {user.name}
                   </span>
-                </div>
-                <Button variant="ghost" size="sm" onClick={handleLogout}>
-                  Logout
-                </Button>
+                  <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${accountOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {accountOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-56 py-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                    <Link
+                      to="/account"
+                      onClick={() => setAccountOpen(false)}
+                      className="flex items-center space-x-2 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <User className="w-4 h-4" />
+                      <span>My Account</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAccountOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex items-center space-x-2 w-full px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Log out</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="hidden lg:flex items-center space-x-3">
@@ -186,12 +225,20 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuToggle }) => {
               </div>
             )}
 
-            {/* User Icon - Mobile */}
-            {!user && (
+            {/* User / Account - Mobile (when logged in: link to dashboard) */}
+            {user ? (
+              <Link
+                to="/account"
+                className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                aria-label="Go to my account"
+              >
+                <User className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+              </Link>
+            ) : (
               <button
                 onClick={() => navigate('/login')}
                 className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                aria-label="User account"
+                aria-label="Sign in"
               >
                 <User className="w-6 h-6 text-gray-700 dark:text-gray-300" />
               </button>
@@ -207,6 +254,14 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuToggle }) => {
           >
             Home
           </Link>
+          {user && (
+            <Link
+              to="/account"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
+            >
+              My Account
+            </Link>
+          )}
           <Link
             to="/products"
             className="text-gray-700 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 font-medium transition-colors"

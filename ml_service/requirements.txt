@@ -13,15 +13,20 @@ alembic==1.13.1
 scikit-learn==1.4.0
 xgboost==2.0.3
 prophet==1.1.5
-lightfm==0.1.0
+# lightfm is optional; pinning/build can fail on some platforms.
+# Install separately if needed: pip install "lightfm==1.17" --no-use-pep517
 pandas==2.2.0
 numpy==1.26.3
 pyarrow==14.0.2
 
 # ML Operations
 mlflow==2.10.1
-prefect==2.14.21
-feast[postgres]==0.44.1
+# prefect is optional; pinned version conflicts with FastAPI/Starlette pins.
+# Install separately if you need orchestration features.
+# prefect==2.14.21
+# feast is optional; recent versions require numpy>=2 which conflicts with pinned numpy.
+# Install separately if you need feature store integration.
+# feast[postgres]==0.59.0
 
 # Data Validation
 great-expectations==0.18.8
@@ -49,5 +54,5 @@ mypy==1.8.0
 
 # Utilities
 python-dateutil==2.8.2
-pytz==2024.1
+pytz==2023.4
 

@@ -3,216 +3,45 @@ import type { RewardsExperience } from '../types/rewards';
 
 const fallbackTemplate: RewardsExperience = {
   summary: {
-    availablePoints: 2430,
-    walletBalance: 42.5,
-    estimatedValue: 24.3,
-    pendingPoints: 180,
-    expiringPoints: 120,
-    expiringOn: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+    availablePoints: 0,
+    walletBalance: 0,
+    estimatedValue: 0,
+    pendingPoints: 0,
+    expiringPoints: 0,
+    expiringOn: null,
   },
   tier: {
-    tier: 'Gold',
-    tierProgress: 36,
-    pointsToNext: 2570,
-    aiTip: 'Complete one more weekly challenge to unlock Platinum faster.',
-    streakMultiplier: 2,
+    tier: 'Silver',
+    tierProgress: 0,
+    pointsToNext: 2500,
+    aiTip: 'Welcome! Place an order to start earning points. 1 pt = $1. Reach Gold at 2,500 pts.',
+    streakMultiplier: 1,
   },
-  transactions: [
-    {
-      id: 'txn-3001',
-      date: new Date().toISOString(),
-      type: 'earned',
-      points: 120,
-      description: 'Challenge completed: Weekend Bundle Builder',
-    },
-    {
-      id: 'txn-2999',
-      date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      type: 'earned',
-      points: 240,
-      description: 'Order #84512 purchase reward',
-      orderId: '84512',
-    },
-    {
-      id: 'txn-2996',
-      date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      type: 'redeemed',
-      points: -500,
-      description: 'Redeemed $5 wallet credit',
-    },
-    {
-      id: 'txn-2988',
-      date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      type: 'earned',
-      points: 75,
-      description: 'Review posted: AirFlex Runner',
-      orderId: '83002',
-    },
-    {
-      id: 'txn-2986',
-      date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-      type: 'earned',
-      points: 300,
-      description: 'Referral bonus – Priya completed first order',
-    },
-  ],
+  transactions: [],
   referrals: {
-    link: 'https://easy11.com/ref/EASY11-JAY-84',
+    link: 'https://easy11.com/ref/EASY11-NEW',
     stats: {
-      invitesSent: 18,
-      signups: 11,
-      conversions: 7,
-      totalRewards: 70,
-      pendingRewards: 20,
+      invitesSent: 0,
+      signups: 0,
+      conversions: 0,
+      totalRewards: 0,
+      pendingRewards: 0,
       lastUpdated: new Date().toISOString(),
     },
-    invites: [
-      {
-        id: 'ref-101',
-        name: 'Priya Rao',
-        email: 'priya.rao@example.com',
-        status: 'rewarded',
-        invitedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-        lastActivity: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        rewardEarned: 10,
-        channel: 'email',
-      },
-      {
-        id: 'ref-102',
-        name: 'Miguel Alvarez',
-        email: 'miguel.alvarez@example.com',
-        status: 'purchased',
-        invitedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-        lastActivity: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        rewardEarned: 10,
-        channel: 'social',
-      },
-      {
-        id: 'ref-103',
-        name: 'Skylar Chen',
-        email: 'skylar.chen@example.com',
-        status: 'joined',
-        invitedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        lastActivity: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        channel: 'copy',
-      },
-      {
-        id: 'ref-104',
-        name: 'Sarah Lee',
-        email: 'sarah.lee@example.com',
-        status: 'pending',
-        invitedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        channel: 'sms',
-      },
-    ],
+    invites: [],
   },
   challenges: {
     streak: {
-      current: 7,
-      best: 21,
-      multiplier: 2,
-      endsAt: new Date(Date.now() + 17 * 60 * 60 * 1000).toISOString(),
+      current: 0,
+      best: 0,
+      multiplier: 1,
+      endsAt: null,
     },
-    daily: [
-      {
-        id: 'daily-collect-reviews',
-        title: 'Write a product review',
-        description: 'Share feedback on an item you purchased this week.',
-        rewardPoints: 25,
-        cadence: 'daily',
-        status: 'active',
-        progress: { current: 0, target: 1, unit: 'actions' },
-        accentColor: 'from-blue-500 to-indigo-500',
-        icon: '📝',
-        cta: { label: 'Review items', href: '/account/orders' },
-      },
-      {
-        id: 'daily-wishlist',
-        title: 'Wishlist refresh',
-        description: 'Add 3 items to your wishlist to get tailored deals.',
-        rewardPoints: 15,
-        cadence: 'daily',
-        status: 'active',
-        progress: { current: 2, target: 3, unit: 'actions' },
-        accentColor: 'from-teal-500 to-emerald-500',
-        icon: '💚',
-        cta: { label: 'Browse items', href: '/products' },
-      },
-    ],
-    weekly: [
-      {
-        id: 'weekly-bundle',
-        title: 'Build a bundle',
-        description: 'Purchase two complementary products in one order.',
-        rewardPoints: 80,
-        cadence: 'weekly',
-        status: 'active',
-        progress: { current: 1, target: 2, unit: 'actions' },
-        accentColor: 'from-purple-500 to-purple-700',
-        icon: '🛍️',
-        cta: { label: 'Shop curated sets', href: '/products?bundle=1' },
-      },
-      {
-        id: 'weekly-referral',
-        title: 'Invite two friends',
-        description: 'Get two friends to sign up with your link.',
-        rewardPoints: 100,
-        cadence: 'weekly',
-        status: 'active',
-        progress: { current: 1, target: 2, unit: 'actions' },
-        accentColor: 'from-amber-500 to-orange-500',
-        icon: '👥',
-        cta: { label: 'Share invite', href: '/account/referrals' },
-      },
-    ],
-    seasonal: [
-      {
-        id: 'seasonal-room-refresh',
-        title: 'Room refresh',
-        description: 'Spend $250 on home goods this season.',
-        rewardPoints: 250,
-        cadence: 'seasonal',
-        status: 'active',
-        progress: { current: 120, target: 250, unit: 'currency' },
-        accentColor: 'from-sky-500 to-blue-600',
-        icon: '🏠',
-        cta: { label: 'Shop home', href: '/products?category=home' },
-      },
-    ],
+    daily: [],
+    weekly: [],
+    seasonal: [],
   },
-  badges: [
-    {
-      id: 'badge-first-order',
-      name: 'First Order',
-      description: 'Completed your very first Easy11 purchase.',
-      icon: '🥇',
-      rarity: 'common',
-      earnedOn: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 'badge-reviewer',
-      name: 'Top Reviewer',
-      description: 'Published 10 high-quality product reviews.',
-      icon: '⭐',
-      rarity: 'rare',
-      earnedOn: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 'badge-streak',
-      name: 'Streak Keeper',
-      description: 'Maintained a 14-day loyalty streak.',
-      icon: '🔥',
-      rarity: 'epic',
-      earnedOn: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 'badge-referral',
-      name: 'Referral Hero',
-      description: 'Converted 5 friends within one month.',
-      icon: '👯',
-      rarity: 'rare',
-    },
-  ],
+  badges: [],
   lastSynced: new Date().toISOString(),
 };
 
@@ -258,4 +87,53 @@ export const rotateReferralLink = async (): Promise<string> => {
   }
 };
 
+/** Validate reward coupon (e.g. E11REWARD-xxx). Returns pointsValue for display; apply pointsValue/100 as dollar discount. */
+export const validateRewardCoupon = async (code: string): Promise<{ code: string; pointsValue: number }> => {
+  const response = await api.get<{ code: string; pointsValue: number }>(`/rewards/coupon/${encodeURIComponent(code.trim().toUpperCase())}`);
+  return response.data;
+};
+
+/** Invalidate a reward coupon (e.g. after order cancelled). If it was used, points are returned to balance. */
+export const invalidateRewardCoupon = async (code: string): Promise<void> => {
+  await api.post(`/rewards/coupon/${encodeURIComponent(code.trim().toUpperCase())}/invalidate`);
+};
+
+/** Mark reward coupon as used for an order (call after order is placed). */
+export const useRewardCoupon = async (code: string, orderId: string): Promise<void> => {
+  await api.post(`/rewards/coupon/${encodeURIComponent(code.trim().toUpperCase())}/use`, { orderId });
+};
+
+/** Add earned points (pending) when order is placed. Backend ledger source of truth. */
+export const addLedgerEarned = async (orderId: string, points: number): Promise<void> => {
+  await api.post('/rewards/ledger/earned', { orderId, points });
+};
+
+/** Convert pending → available when order is delivered. */
+export const convertLedgerPending = async (orderId: string): Promise<void> => {
+  await api.patch('/rewards/ledger/convert', { orderId });
+};
+
+/** Reverse points when order is cancelled or returned. */
+export const reverseLedger = async (orderId: string, reason: 'cancelled' | 'returned'): Promise<void> => {
+  await api.post('/rewards/ledger/reverse', { orderId, reason });
+};
+
+/** Redeem points for a voucher. Returns coupon code. Backend creates ledger entry + coupon. */
+export const redeemRewardPoints = async (points: number): Promise<{ couponCode: string; points: number }> => {
+  const res = await api.post<{ couponCode: string; points: number }>('/rewards/redeem', { points });
+  return res.data;
+};
+
+/** Create referral attribution when referee signs up with ref=referrerId in URL. */
+export const createReferralAttribution = async (referrerId: string): Promise<void> => {
+  await api.post('/rewards/referral', { referrerId });
+};
+
+/** Notify backend that order was delivered. Triggers referral payout if referee's first order. */
+export const notifyOrderDelivered = async (): Promise<{ awarded: boolean; refereeVoucherCode?: string }> => {
+  const res = await api.post<{ awarded: boolean; refereeVoucherCode?: string; refereeVoucherValue?: number }>(
+    '/rewards/referral/on-order-delivered'
+  );
+  return res.data;
+};
 

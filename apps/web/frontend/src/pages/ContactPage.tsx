@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Send, MessageSquare, Clock } from 'lucide-react';
 import { Button, Input } from '../components/ui';
+import BreadcrumbBack from '../components/navigation/BreadcrumbBack';
 import toast from 'react-hot-toast';
+import { useSupportTicketsStore } from '../store/supportTicketsStore';
 
 /**
  * Contact Page
@@ -15,6 +18,21 @@ import toast from 'react-hot-toast';
  * - Support channels
  */
 export default function ContactPage() {
+  const [searchParams] = useSearchParams();
+  const fromParam = searchParams.get('from');
+  const typeParam = searchParams.get('type');
+  const topicParam = searchParams.get('topic');
+  const fromSupport = fromParam === 'support' || fromParam === 'account-support';
+  const supportBackUrl = fromParam === 'account-support' ? '/account/support' : '/support';
+  const addTicket = useSupportTicketsStore((s) => s.addTicket);
+
+  const PRESETS: Record<string, { subject: string; message: string }> = {
+    'wrong-item': { subject: 'Wrong item received', message: 'I received the wrong item. Order number: [please add]. I expected: [item]. I received: [item].' },
+    'refund-delay': { subject: 'Refund delayed', message: 'My refund has been delayed. Order number: [please add]. Expected refund date: [date if known].' },
+    'delivery-issue': { subject: 'Delivery issue', message: 'I am experiencing a delivery issue. Order number: [please add]. Issue: [missing/late/damaged/other].' },
+    'data-request': { subject: 'Data request (GDPR/CCPA)', message: 'I would like to request a copy of my personal data / exercise my privacy rights.' },
+  };
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -22,6 +40,11 @@ export default function ContactPage() {
     message: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const preset = typeParam ? PRESETS[typeParam] : topicParam ? PRESETS[topicParam] : null;
+    if (preset) setFormData((f) => ({ ...f, subject: preset.subject, message: preset.message }));
+  }, [typeParam, topicParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,13 +64,14 @@ export default function ContactPage() {
     }
 
     try {
-      // TODO: Connect to backend API
-      console.log('Contact form submission:', formData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast.success('Thank you for contacting us! We\'ll get back to you soon.');
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const ticket = addTicket({
+        category: 'other',
+        priority: 'normal',
+        subject: formData.subject,
+        message: formData.message,
+      });
+      toast.success(`Ticket created: #${ticket.id.slice(-8).toUpperCase()}. Track status in My Account → Support.`);
       setFormData({ name: '', email: '', subject: '', message: '' });
     } catch (error) {
       toast.error('Failed to send message. Please try again.');
@@ -66,6 +90,16 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Breadcrumb when opened from Support */}
+      {fromSupport && (
+        <div className="container-custom pt-4 pb-0">
+          <BreadcrumbBack
+            parentLabel="Support"
+            parentUrl={supportBackUrl}
+            currentPage="Contact Us"
+          />
+        </div>
+      )}
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-16">
         <div className="container-custom">

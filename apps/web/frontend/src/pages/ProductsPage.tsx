@@ -1,14 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MessageSquare, Search as SearchIcon } from 'lucide-react';
+import { MessageSquare, Search as SearchIcon, SlidersHorizontal } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button, Loading } from '../components/ui';
 import Breadcrumb from '../components/products/Breadcrumb';
 import CategoryBanner from '../components/products/CategoryBanner';
-import FilterSidebar, { ProductFilters } from '../components/products/FilterSidebar';
+import FilterSidebar, { ProductFilters, DEFAULT_FILTERS } from '../components/products/FilterSidebar';
+import FilterDrawer from '../components/products/FilterDrawer';
+import AppliedFilterChips from '../components/products/AppliedFilterChips';
 import SortingBar, { SortOption, ViewMode } from '../components/products/SortingBar';
 import ProductCard, { Product } from '../components/products/ProductCard';
+import { ALL_PRODUCTS } from '../data/productCatalog';
 import QuickViewModal from '../components/products/QuickViewModal';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
@@ -50,9 +53,13 @@ export const ProductsPage = () => {
   const isNew = searchParams.get('new');
   const isFeatured = searchParams.get('featured');
   const searchQuery = searchParams.get('search') || '';
+  const urlSort = searchParams.get('sort');
+
+  const validSorts: SortOption[] = ['relevance', 'price_asc', 'price_desc', 'rating_desc', 'newest', 'trending'];
+  const initialSort = (urlSort && validSorts.includes(urlSort as SortOption)) ? (urlSort as SortOption) : 'relevance';
 
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [sortBy, setSortBy] = useState<SortOption>('relevance');
+  const [sortBy, setSortBy] = useState<SortOption>(initialSort);
   const [aiSortEnabled, setAiSortEnabled] = useState(false);
   const [filters, setFilters] = useState<ProductFilters>({
     priceRange: [0, 2000],
@@ -67,24 +74,22 @@ export const ProductsPage = () => {
   });
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const PRODUCTS_PER_PAGE = 9;
   const [isLoading, setIsLoading] = useState(false);
   const [personalizedIds, setPersonalizedIds] = useState<string[] | null>(null);
 
-  // Sample products (will be fetched from API)
-  const allProducts: Product[] = [
-    { id: '1', name: 'Wireless Headphones Pro Max', price: 299.99, originalPrice: 399.99, rating: 4.8, reviews: 1234, image: '🎧', category: 'Electronics', stock: 100, badge: 'Best Seller', isAiRecommended: true, isTrending: true },
-    { id: '2', name: 'Smart Watch Ultra', price: 599.99, rating: 4.9, reviews: 892, image: '⌚', category: 'Electronics', stock: 50, badge: 'New Arrival', isNew: true },
-    { id: '3', name: 'Designer Backpack Premium', price: 129.99, originalPrice: 179.99, rating: 4.7, reviews: 2103, image: '🎒', category: 'Accessories', stock: 8, isTrending: true },
-    { id: '4', name: 'Premium Bluetooth Speaker', price: 449.99, rating: 4.6, reviews: 567, image: '🔊', category: 'Electronics', stock: 75, isAiRecommended: true },
-    { id: '5', name: 'Laptop Pro 15" MacBook Style', price: 1299.99, rating: 4.9, reviews: 745, image: '💻', category: 'Electronics', stock: 30, badge: 'Editor\'s Choice' },
-    { id: '6', name: 'Fitness Tracker Band', price: 89.99, originalPrice: 129.99, rating: 4.5, reviews: 1891, image: '📊', category: 'Fitness', stock: 200 },
-    { id: '7', name: 'Wireless Gaming Mouse RGB', price: 79.99, rating: 4.7, reviews: 3210, image: '🖱️', category: 'Electronics', stock: 150, isTrending: true },
-    { id: '8', name: 'Premium Phone Case Leather', price: 34.99, rating: 4.6, reviews: 5432, image: '📱', category: 'Accessories', stock: 300 },
-    { id: '9', name: 'Wireless Keyboard Mechanical', price: 149.99, rating: 4.8, reviews: 987, image: '⌨️', category: 'Electronics', stock: 60, isAiRecommended: true },
-    { id: '10', name: 'Smart Home Camera 4K', price: 199.99, originalPrice: 249.99, rating: 4.7, reviews: 654, image: '📷', category: 'Electronics', stock: 45, badge: 'Hot Deal' },
-    { id: '11', name: 'Running Shoes Pro Elite', price: 159.99, rating: 4.9, reviews: 2345, image: '👟', category: 'Clothing', stock: 120, isNew: true },
-    { id: '12', name: 'Sunglasses Polarized UV400', price: 89.99, rating: 4.5, reviews: 876, image: '🕶️', category: 'Accessories', stock: 95 },
-  ];
+  // Sync sort from URL when it changes (e.g. link with ?sort=price_asc)
+  useEffect(() => {
+    if (urlSort && validSorts.includes(urlSort as SortOption)) {
+      setSortBy(urlSort as SortOption);
+    }
+  }, [urlSort]);
+
+  // Single source of truth: same catalog as home (Trending + Personalization) so all products appear here
+  const allProducts: Product[] = ALL_PRODUCTS;
 
   // Filter products
   let filteredProducts = allProducts.filter((product) => {
@@ -130,6 +135,26 @@ export const ProductsPage = () => {
     // AI Recommended filter
     if (filters.aiRecommended && !product.isAiRecommended) {
       return false;
+    }
+
+    // Brand filter
+    if (filters.brands.length > 0 && product.brand && !filters.brands.includes(product.brand)) {
+      return false;
+    }
+    if (filters.brands.length > 0 && !product.brand) {
+      return false;
+    }
+
+    // Delivery Speed filter (1-Day = ≤1, 2-Day = ≤2, Standard = >2)
+    if (filters.deliverySpeed.length > 0) {
+      const days = product.deliveryDays ?? 3;
+      const matches = filters.deliverySpeed.some((opt) => {
+        if (opt === '1-Day') return days <= 1;
+        if (opt === '2-Day') return days <= 2;
+        if (opt === 'Standard') return days > 2;
+        return false;
+      });
+      if (!matches) return false;
     }
 
     return true;
@@ -225,28 +250,40 @@ export const ProductsPage = () => {
     setPersonalizedIds(null);
   }, [filters.aiRecommended]);
 
+  // Only apply AI personalization when user enables it; otherwise respect sort/filters
   const personalizedProducts = useMemo(() => {
-    if (!personalizedIds || personalizedIds.length === 0) {
+    if (!aiSortEnabled || !personalizedIds || personalizedIds.length === 0) {
       return sortedProducts;
     }
     const productMap = new Map(sortedProducts.map((product) => [product.id, product]));
     const deduped = personalizedIds
       .map((id) => productMap.get(id))
       .filter((product): product is Product => Boolean(product));
-    // Ensure we include any items not present in reranked order (fallback)
     const remaining = sortedProducts.filter((product) => !personalizedIds.includes(product.id));
     return [...deduped, ...remaining];
-  }, [personalizedIds, sortedProducts]);
+  }, [aiSortEnabled, personalizedIds, sortedProducts]);
+
+  // Reset to page 1 when products change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, category, searchQuery, personalizedProducts.length]);
+
+  const totalPages = Math.ceil(personalizedProducts.length / PRODUCTS_PER_PAGE);
+  const paginatedProducts = personalizedProducts.slice(
+    (currentPage - 1) * PRODUCTS_PER_PAGE,
+    currentPage * PRODUCTS_PER_PAGE
+  );
 
   // Count active filters
+  const priceIsDefault = filters.priceRange[0] === 0 && filters.priceRange[1] === 2000;
   const activeFilterCount =
-    (filters.brands.length > 0 ? 1 : 0) +
+    (filters.brands.length > 0 ? filters.brands.length : 0) +
     (filters.minRating > 0 ? 1 : 0) +
     (filters.inStockOnly ? 1 : 0) +
     (filters.onSaleOnly ? 1 : 0) +
     (filters.aiRecommended ? 1 : 0) +
-    (filters.deliverySpeed.length > 0 ? 1 : 0) +
-    (filters.priceRange[1] < 2000 ? 1 : 0);
+    (filters.deliverySpeed.length > 0 ? filters.deliverySpeed.length : 0) +
+    (priceIsDefault ? 0 : 1);
 
   const handleToggleFavorite = (productId: string) => {
     setFavorites((prev) => {
@@ -326,9 +363,10 @@ export const ProductsPage = () => {
 
         {/* Main Content Grid */}
         <div className="grid lg:grid-cols-4 gap-8">
-          {/* Filter Sidebar */}
-          <aside className="lg:col-span-1">
+          {/* Filter Sidebar - desktop only */}
+          <aside className="hidden lg:block lg:col-span-1">
             <FilterSidebar
+              filters={filters}
               onFilterChange={setFilters}
               activeFilterCount={activeFilterCount}
             />
@@ -336,6 +374,36 @@ export const ProductsPage = () => {
 
           {/* Products Section */}
           <div className="lg:col-span-3">
+            {/* Mobile Filters Button */}
+            <button
+              type="button"
+              onClick={() => setFilterDrawerOpen(true)}
+              className="lg:hidden mb-4 flex items-center gap-2 px-4 py-3 w-full sm:w-auto rounded-lg border-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-semibold"
+            >
+              <SlidersHorizontal className="w-5 h-5" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-1 px-2 py-0.5 rounded-full bg-blue-500 text-white text-xs">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
+            {/* Mobile Filter Drawer */}
+            <FilterDrawer
+              isOpen={filterDrawerOpen}
+              onClose={() => setFilterDrawerOpen(false)}
+              filters={filters}
+              onFilterChange={setFilters}
+              activeFilterCount={activeFilterCount}
+            />
+            {/* Applied filter chips - above grid */}
+            <AppliedFilterChips
+              filters={filters}
+              onRemoveFilter={(updates) => setFilters((prev) => ({ ...prev, ...updates }))}
+              onClearAll={() => setFilters(DEFAULT_FILTERS)}
+            />
+
             {/* Sorting Bar */}
             <SortingBar
               productCount={sortedProducts.length}
@@ -370,6 +438,7 @@ export const ProductsPage = () => {
                 <Loading size="lg" text="Loading products..." />
               </div>
             ) : personalizedProducts.length > 0 ? (
+              <>
               <div
                 className={
                   viewMode === 'grid'
@@ -377,7 +446,7 @@ export const ProductsPage = () => {
                     : 'space-y-4'
                 }
               >
-                {personalizedProducts.map((product) => (
+                {paginatedProducts.map((product) => (
                   <ProductCard
                     key={product.id}
                     product={product}
@@ -389,6 +458,69 @@ export const ProductsPage = () => {
                   />
                 ))}
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <nav
+                  className="mt-12 flex flex-wrap items-center justify-center gap-2"
+                  aria-label="Product pagination"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  >
+                    Previous
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((page) => {
+                        if (totalPages <= 7) return true;
+                        return (
+                          page === 1 ||
+                          page === totalPages ||
+                          Math.abs(page - currentPage) <= 2
+                        );
+                      })
+                      .reduce<(number | 'ellipsis')[]>((acc, page, idx, arr) => {
+                        const prev = arr[idx - 1];
+                        if (prev !== undefined && page - prev > 1) {
+                          acc.push('ellipsis');
+                        }
+                        acc.push(page);
+                        return acc;
+                      }, [])
+                      .map((item, idx) =>
+                        item === 'ellipsis' ? (
+                          <span key={`ell-${idx}`} className="px-1 text-gray-500">…</span>
+                        ) : (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => setCurrentPage(item)}
+                            className={`min-w-[2.5rem] px-3 py-2 rounded-lg font-medium transition-colors ${
+                              currentPage === item
+                                ? 'bg-blue-500 text-white'
+                                : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        )
+                      )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  >
+                    Next
+                  </button>
+                </nav>
+              )}
+              </>
             ) : (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -402,30 +534,12 @@ export const ProductsPage = () => {
                 <p className="text-gray-600 dark:text-gray-400 mb-6">
                   Try adjusting your filters or search criteria
                 </p>
-                <Button variant="primary" onClick={() => setFilters({
-                  priceRange: [0, 2000],
-                  brands: [],
-                  minRating: 0,
-                  inStockOnly: false,
-                  onSaleOnly: false,
-                  aiRecommended: false,
-                  deliverySpeed: [],
-                  colors: [],
-                  sizes: [],
-                })}>
+                <Button variant="primary" onClick={() => setFilters(DEFAULT_FILTERS)}>
                   Clear All Filters
                 </Button>
               </motion.div>
             )}
 
-            {/* Load More */}
-            {personalizedProducts.length > 0 && personalizedProducts.length >= 12 && (
-              <div className="text-center mt-12">
-                <Button variant="secondary" size="lg">
-                  Load More Products
-                </Button>
-              </div>
-            )}
           </div>
         </div>
 

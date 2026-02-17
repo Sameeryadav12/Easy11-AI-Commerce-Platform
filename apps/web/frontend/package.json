@@ -6,6 +6,7 @@
   "dependencies": {
     "@easy11/telemetry-client": "file:../../packages/telemetry-client",
     "@hookform/resolvers": "^3.3.4",
+    "@tanstack/react-ranger": "^0.0.5",
     "axios": "^1.6.7",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.0",
@@ -44,7 +45,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\""

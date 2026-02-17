@@ -4,8 +4,9 @@
  */
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Address, AddressFormData } from '../types/dashboard';
+import { userScopedStorage } from './userScopedStorage';
 
 interface AddressState {
   addresses: Address[];
@@ -78,7 +79,9 @@ export const useAddressStore = create<AddressState>()(
     }),
     {
       name: 'easy11-addresses',
-      getStorage: () => localStorage,
+      storage: createJSONStorage(() => userScopedStorage),
+      skipHydration: true,
+      partialize: (state) => ({ addresses: state.addresses }),
     }
   )
 );

@@ -100,12 +100,12 @@ export default function VoiceCommandButton({ className }: VoiceCommandButtonProp
         {isListening ? (
           <>
             <StopCircle className="w-4 h-4 animate-pulse" />
-            Listening…
+            <span className="voice-label">Listening…</span>
           </>
         ) : (
           <>
             <Mic className="w-4 h-4" />
-            Voice
+            <span className="voice-label">Voice</span>
           </>
         )}
       </Button>

@@ -1,0 +1,20 @@
+{
+  "name": "easy11",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Easy11 Commerce Intelligence Platform - monorepo root",
+  "scripts": {
+    "dev:infra": "docker compose up -d postgres redis",
+    "dev:infra:down": "docker compose down",
+    "dev:db": "cd backend && npx prisma generate && npx prisma migrate deploy && npm run prisma:seed",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd apps/web/frontend && npm run dev",
+    "dev": "node scripts/run-dev.js",
+    "start": "node scripts/run-dev.js",
+    "start:app": "powershell -ExecutionPolicy Bypass -File scripts/start-app.ps1",
+    "postinstall": "cd backend && npm install && cd ../apps/web/frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

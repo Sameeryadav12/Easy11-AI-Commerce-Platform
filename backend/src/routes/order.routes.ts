@@ -13,6 +13,7 @@ const createOrderSchema = z.object({
     price: z.number().positive()
   })),
   shippingAddress: z.object({
+    name: z.string().optional(),
     street: z.string(),
     city: z.string(),
     state: z.string(),
@@ -101,7 +102,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res, next) => {
       data: {
         userId: req.user!.id,
         total,
-        shippingAddress: shippingAddress as any,
+        shippingAddress: { ...shippingAddress, address: shippingAddress.street } as any,
         items: {
           create: items.map(item => ({
             productId: item.productId,
@@ -119,7 +120,64 @@ router.post('/', authenticateToken, async (req: AuthRequest, res, next) => {
       }
     });
 
+    // Award points server-side (1 point per $1 subtotal, rounded down)
+    const pointsToAward = Math.floor(total);
+    if (pointsToAward > 0) {
+      await prisma.pointsLedgerEntry.create({
+        data: {
+          userId: req.user!.id,
+          orderId: order.id,
+          type: 'earned',
+          status: 'pending',
+          points: pointsToAward,
+        },
+      });
+    }
+
     res.status(201).json({ order });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Cancel order: set status to CANCELLED and reverse any earned points
+router.patch('/:id/cancel', authenticateToken, async (req: AuthRequest, res, next) => {
+  try {
+    const orderId = req.params.id;
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, userId: req.user!.id },
+    });
+    if (!order) {
+      throw new AppError('Order not found', 404);
+    }
+    if (order.status === 'CANCELLED') {
+      return res.json({ order, message: 'Already cancelled' });
+    }
+
+    const entries = await prisma.pointsLedgerEntry.findMany({
+      where: { userId: req.user!.id, orderId, type: 'earned' },
+    });
+    const toReverse = entries.reduce((sum, e) => sum + e.points, 0);
+    if (toReverse > 0) {
+      await prisma.pointsLedgerEntry.create({
+        data: {
+          userId: req.user!.id,
+          orderId,
+          type: 'reversed',
+          points: -toReverse,
+          reason: 'cancelled',
+        },
+      });
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'CANCELLED' },
+      include: {
+        items: { include: { product: true } },
+      },
+    });
+    res.json({ order: updated, pointsReversed: toReverse });
   } catch (error) {
     next(error);
   }

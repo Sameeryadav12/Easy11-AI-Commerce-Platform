@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Search, HelpCircle, ShoppingBag, CreditCard, Truck, Shield, User } from 'lucide-react';
 import { Input } from '../components/ui';
+import BreadcrumbBack from '../components/navigation/BreadcrumbBack';
 
 /**
  * FAQ Page
@@ -19,6 +21,8 @@ interface FAQItem {
   answer: string;
   category: 'general' | 'shipping' | 'orders' | 'payments' | 'account' | 'returns';
 }
+
+const VALID_FAQ_CATEGORIES = ['general', 'shipping', 'orders', 'payments', 'account', 'returns'] as const;
 
 const faqData: FAQItem[] = [
   // General
@@ -148,9 +152,30 @@ const categories = [
 ];
 
 export default function FAQPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchParams] = useSearchParams();
+  const fromParam = searchParams.get('from');
+  const qParam = searchParams.get('q') || '';
+  const fromSupport = fromParam === 'support' || fromParam === 'account-support';
+  const supportBackUrl = fromParam === 'account-support' ? '/account/support' : '/support';
+
+  const [searchQuery, setSearchQuery] = useState(qParam);
+  const categoryParam = searchParams.get('category');
+  const initialCategory =
+    categoryParam && VALID_FAQ_CATEGORIES.includes(categoryParam as (typeof VALID_FAQ_CATEGORIES)[number])
+      ? categoryParam
+      : 'all';
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
   const [openItems, setOpenItems] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (categoryParam && VALID_FAQ_CATEGORIES.includes(categoryParam as (typeof VALID_FAQ_CATEGORIES)[number])) {
+      setSelectedCategory(categoryParam);
+    }
+  }, [categoryParam]);
+
+  useEffect(() => {
+    if (qParam) setSearchQuery(qParam);
+  }, [qParam]);
 
   const toggleItem = (id: string) => {
     const newOpenItems = new Set(openItems);
@@ -173,6 +198,15 @@ export default function FAQPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {fromSupport && (
+        <div className="container-custom pt-4 pb-0">
+          <BreadcrumbBack
+            parentLabel="Support"
+            parentUrl={supportBackUrl}
+            currentPage="FAQ"
+          />
+        </div>
+      )}
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-16">
         <div className="container-custom">

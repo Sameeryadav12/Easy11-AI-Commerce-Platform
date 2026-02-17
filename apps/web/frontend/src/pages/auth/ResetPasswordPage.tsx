@@ -143,7 +143,7 @@ export default function ResetPasswordPage() {
       });
 
       // Redirect to account
-      navigate('/account', { replace: true });
+      navigate('/', { replace: true });
     } catch (error) {
       toast.error('Failed to reset password. Please try again.');
     } finally {

@@ -172,17 +172,22 @@ export const getPaymentMethods = async (): Promise<PaymentMethod[]> => {
   return [...mockPaymentMethods];
 };
 
-export const addPaymentMethod = async (pspToken: string, nickname?: string, isDefault = false): Promise<PaymentMethod> => {
+export const addPaymentMethod = async (
+  pspToken: string,
+  nickname?: string,
+  isDefault = false,
+  metadata?: { last4: string; brand: string; expiry: string }
+): Promise<PaymentMethod> => {
   await delay(600);
 
-  // In real app, pspToken comes from Stripe/PSP tokenization
+  // In real app, pspToken comes from Stripe/PSP tokenization; metadata from PSP response
   const newMethod: PaymentMethod = {
     id: 'pm-' + Date.now(),
     user_id: 'user-123',
     psp_token: pspToken,
-    brand: 'visa', // Would be detected from token
-    last4: '9999',
-    expiry: '12/2026',
+    brand: (metadata?.brand ?? 'visa') as PaymentMethod['brand'],
+    last4: metadata?.last4 ?? '9999',
+    expiry: metadata?.expiry ?? '12/2026',
     nickname,
     is_default: isDefault,
     created_at: new Date().toISOString(),

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 32" fill="none" role="img">
+  <!-- Generic mail/post icon in Australia Post–style orange -->
+  <rect width="48" height="32" rx="4" fill="#F04028"/>
+  <path d="M8 12 L24 20 L40 12 M8 12 L8 24 L40 24 L40 12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

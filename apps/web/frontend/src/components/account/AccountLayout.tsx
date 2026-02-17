@@ -7,9 +7,6 @@ import {
   RotateCcw,
   Heart,
   Gift,
-  Share2,
-  Target,
-  History,
   User,
   Settings,
   HelpCircle,
@@ -21,6 +18,9 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useRewardsStore } from '../../store/rewardsStore';
+import { useNotificationStore } from '../../store/notificationStore';
+import { useOrdersStore } from '../../store/ordersStore';
+import { useWishlistStore } from '../../store/wishlistStore';
 import ThemeToggle from '../ThemeToggle';
 
 interface AccountLayoutProps {
@@ -40,17 +40,26 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
   const { user, logout } = useAuthStore();
   const { points, tier } = useRewardsStore();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [notifications, setNotifications] = useState(2); // Mock notifications
+  const { unreadCount: notifications } = useNotificationStore();
+  const ordersCount = useOrdersStore((state) => state.orders.length);
+  const wishlistCount = useWishlistStore((state) => state.items.length);
 
   const navigationItems: NavItem[] = [
     { label: 'Dashboard', path: '/account', icon: LayoutDashboard },
-    { label: 'My Orders', path: '/account/orders', icon: Package, badge: 2 },
+    {
+      label: 'My Orders',
+      path: '/account/orders',
+      icon: Package,
+      badge: ordersCount > 0 ? ordersCount : undefined,
+    },
     { label: 'Returns & Refunds', path: '/account/returns', icon: RotateCcw },
-    { label: 'Wishlist', path: '/account/wishlist', icon: Heart, badge: 3 },
-    { label: 'Rewards & Wallet', path: '/account/rewards', icon: Gift },
-    { label: 'Referrals & Invites', path: '/account/referrals', icon: Share2 },
-    { label: 'Challenges & Badges', path: '/account/rewards/challenges', icon: Target },
-    { label: 'Points History', path: '/account/rewards/history', icon: History },
+    {
+      label: 'Wishlist',
+      path: '/account/wishlist',
+      icon: Heart,
+      badge: wishlistCount > 0 ? wishlistCount : undefined,
+    },
+    { label: 'Rewards', path: '/account/rewards', icon: Gift },
     { label: 'Profile & Security', path: '/account/profile', icon: User },
     { label: 'Settings', path: '/account/settings', icon: Settings },
     { label: 'Support', path: '/account/support', icon: HelpCircle },

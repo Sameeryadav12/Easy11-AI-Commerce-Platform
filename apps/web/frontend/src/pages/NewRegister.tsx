@@ -1,13 +1,74 @@
-import { useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Check, X } from 'lucide-react';
 import { Button, Card, CardBody, Input } from '../components/ui';
+import { register as registerApi } from '../services/auth';
+import { useAuthStore } from '../store/authStore';
+import { useRecentlyViewedStore } from '../store/recentlyViewedStore';
+import {
+  validateFullName,
+  validateEmail,
+  validatePassword,
+  validateConfirmPassword,
+  getPasswordStrength,
+  type PasswordStrengthResult,
+} from '../utils/registerValidation';
+
+function PasswordStrengthMeter({ strength: result }: { strength: PasswordStrengthResult }) {
+  const { strength, checks } = result;
+  const labels: Record<string, string> = {
+    weak: 'Weak',
+    fair: 'Fair',
+    good: 'Good',
+    strong: 'Strong',
+  };
+  const strengthColors: Record<string, string> = {
+    weak: 'bg-red-500',
+    fair: 'bg-amber-500',
+    good: 'bg-lime-500',
+    strong: 'bg-green-600',
+  };
+  const items = [
+    { key: 'length8', done: checks.length8, label: '8+ characters' },
+    { key: 'uppercase', done: checks.uppercase, label: 'Uppercase' },
+    { key: 'lowercase', done: checks.lowercase, label: 'Lowercase' },
+    { key: 'number', done: checks.number, label: 'Number' },
+    { key: 'special', done: checks.special, label: 'Special character' },
+    { key: 'notCommon', done: checks.notCommon, label: 'Not a common password' },
+    { key: 'notEmail', done: checks.notEmail, label: 'Does not contain email' },
+  ];
+  if (!result.score && !result.checks.length8) return null;
+  return (
+    <div className="mt-2 space-y-2" role="status" aria-live="polite">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Strength:</span>
+        <span className="text-xs font-semibold capitalize">{labels[strength]}</span>
+        <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${strengthColors[strength]}`}
+            style={{ width: strength === 'weak' ? '25%' : strength === 'fair' ? '50%' : strength === 'good' ? '75%' : '100%' }}
+          />
+        </div>
+      </div>
+      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
+        {items.map(({ key, done, label }) => (
+          <li key={key} className="flex items-center gap-1.5">
+            {done ? <Check className="w-3.5 h-3.5 text-green-600 shrink-0" /> : <X className="w-3.5 h-3.5 text-gray-400 shrink-0" />}
+            <span className={done ? 'text-green-700 dark:text-green-400' : ''}>{label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export const NewRegister = () => {
   const navigate = useNavigate();
-  
+  const setAuth = useAuthStore((state) => state.setAuth);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,38 +79,89 @@ export const NewRegister = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
+  const emailForValidation = formData.email.trim().toLowerCase();
+
+  const passwordStrength = useMemo(
+    () => getPasswordStrength(formData.password, emailForValidation, formData.name.trim()),
+    [formData.password, emailForValidation, formData.name]
+  );
+
+  const nameValidation = useMemo(() => validateFullName(formData.name), [formData.name]);
+  const emailValidation = useMemo(() => validateEmail(formData.email), [formData.email]);
+  const passwordValidation = useMemo(
+    () => validatePassword(formData.password, emailForValidation, formData.name.trim()),
+    [formData.password, emailForValidation, formData.name]
+  );
+  const confirmValidation = useMemo(
+    () => validateConfirmPassword(formData.password, formData.confirmPassword),
+    [formData.password, formData.confirmPassword]
+  );
+
+  const isFormValid =
+    nameValidation.valid &&
+    emailValidation.valid &&
+    passwordValidation.valid &&
+    confirmValidation.valid &&
+    formData.agreeToTerms;
+
+  useEffect(() => {
+    fetch('/api/v1/__debug/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run8',
+        hypothesisId: 'S',
+        location: 'src/pages/NewRegister.tsx:useEffect',
+        message: 'NewRegister mounted',
+        data: { pathname: typeof window !== 'undefined' ? window.location.pathname : 'no-window' },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    if (!isFormValid || isLoading) return;
+
     setIsLoading(true);
 
-    // Validation
-    const newErrors: Record<string, string> = {};
-    
-    if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-    
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-    
-    if (!formData.agreeToTerms) {
-      newErrors.terms = 'You must agree to the terms and conditions';
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // TODO: Connect to backend API
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      navigate('/login');
+      if (typeof registerApi !== 'function') {
+        throw new Error('Registration service not available. Please refresh the page.');
+      }
+
+      const nameTrimmed = formData.name.trim();
+      const emailLower = formData.email.trim().toLowerCase();
+      const termsAcceptedAt = formData.agreeToTerms ? new Date().toISOString() : undefined;
+
+      const response = await registerApi(emailLower, formData.password, nameTrimmed, termsAcceptedAt);
+
+      if (!response?.user || !response?.accessToken) {
+        throw new Error('Invalid response from server');
+      }
+
+      // Business tactics: fresh start for new account — clear any guest "recently viewed" so they don't see it after signup
+      useRecentlyViewedStore.getState().clearHistory();
+      setAuth(response);
+      navigate('/');
     } catch (err: any) {
-      setErrors({ general: err.message || 'Registration failed' });
+      const status = err?.response?.status;
+      const apiMessage = err?.response?.data?.message || err?.response?.data?.error?.message;
+
+      const isDuplicateEmail = status === 409 || (status === 400 && /email already|already registered/i.test(apiMessage || ''));
+      if (isDuplicateEmail) {
+        setErrors({ email: 'Email already in use' });
+      } else {
+        const friendlyMessage =
+          apiMessage ||
+          (status === 400 ? 'Please check your details and try again.' : null) ||
+          (status === 429 ? 'Too many attempts. Please wait and try again.' : null) ||
+          err?.message ||
+          'Registration failed';
+        setErrors({ general: friendlyMessage });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -57,15 +169,23 @@ export const NewRegister = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value,
-    });
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors({ ...errors, [name]: '' });
+    let finalValue: string | boolean = type === 'checkbox' ? checked : value;
+    if (type !== 'checkbox' && typeof finalValue === 'string' && name === 'name') {
+      finalValue = value;
     }
+    setFormData((prev) => ({ ...prev, [name]: finalValue }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+    if (errors.general) setErrors((prev) => ({ ...prev, general: '' }));
   };
+
+  const handleBlur = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const nameError = (touched.name || formData.name) ? nameValidation.message : undefined;
+  const emailError = (touched.email || formData.email) ? emailValidation.message : errors.email || undefined;
+  const passwordError = (touched.password || formData.password) ? passwordValidation.message : (errors.password || undefined);
+  const confirmError = (formData.password || formData.confirmPassword) ? confirmValidation.message : (errors.confirmPassword || undefined);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 py-16">
@@ -94,60 +214,71 @@ export const NewRegister = () => {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <Input
-                  label="Full Name"
+                  label="Full Name *"
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  placeholder="John Doe"
+                  onBlur={() => handleBlur('name')}
+                  placeholder="e.g. Sameer Yadav, O'Connor"
                   leftIcon={<User className="w-5 h-5" />}
+                  error={nameError}
                   required
+                  autoComplete="name"
                 />
 
                 <Input
-                  label="Email Address"
+                  label="Email Address *"
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
+                  onBlur={() => handleBlur('email')}
                   placeholder="you@example.com"
                   leftIcon={<Mail className="w-5 h-5" />}
-                  error={errors.email}
+                  error={emailError}
                   required
+                  autoComplete="email"
                 />
 
-                <Input
-                  label="Password"
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  placeholder="At least 8 characters"
-                  leftIcon={<Lock className="w-5 h-5" />}
-                  rightIcon={
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="hover:text-blue-500 transition-colors"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="w-5 h-5" />
-                      ) : (
-                        <Eye className="w-5 h-5" />
-                      )}
-                    </button>
-                  }
-                  error={errors.password}
-                  helperText="Must be at least 8 characters"
-                  required
-                />
+                <div>
+                  <Input
+                    label="Password *"
+                    type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    onBlur={() => handleBlur('password')}
+                    placeholder="At least 8 characters"
+                    leftIcon={<Lock className="w-5 h-5" />}
+                    rightIcon={
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="hover:text-blue-500 transition-colors"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-5 h-5" />
+                        ) : (
+                          <Eye className="w-5 h-5" />
+                        )}
+                      </button>
+                    }
+                    error={passwordError}
+                    required
+                    autoComplete="new-password"
+                  />
+                  <PasswordStrengthMeter strength={passwordStrength} />
+                </div>
 
                 <Input
-                  label="Confirm Password"
+                  label="Confirm Password *"
                   type={showConfirmPassword ? 'text' : 'password'}
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
+                  onBlur={() => handleBlur('confirmPassword')}
                   placeholder="Repeat your password"
                   leftIcon={<Lock className="w-5 h-5" />}
                   rightIcon={
@@ -155,6 +286,7 @@ export const NewRegister = () => {
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       className="hover:text-blue-500 transition-colors"
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                     >
                       {showConfirmPassword ? (
                         <EyeOff className="w-5 h-5" />
@@ -163,8 +295,9 @@ export const NewRegister = () => {
                       )}
                     </button>
                   }
-                  error={errors.confirmPassword}
+                  error={confirmError}
                   required
+                  autoComplete="new-password"
                 />
 
                 {/* Terms & Conditions */}
@@ -177,20 +310,21 @@ export const NewRegister = () => {
                     onChange={handleInputChange}
                     className="mt-1 w-4 h-4 text-blue-500 border-gray-300 rounded focus:ring-blue-500"
                     required
+                    aria-required="true"
                   />
                   <label htmlFor="terms" className="text-sm text-gray-600 dark:text-gray-400">
                     I agree to the{' '}
-                    <Link to="/terms" className="text-blue-500 hover:text-blue-600">
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600">
                       Terms of Service
-                    </Link>{' '}
+                    </a>{' '}
                     and{' '}
-                    <Link to="/privacy" className="text-blue-500 hover:text-blue-600">
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600">
                       Privacy Policy
-                    </Link>
+                    </a>
                   </label>
                 </div>
-                {errors.terms && (
-                  <p className="text-sm text-red-600 dark:text-red-400">{errors.terms}</p>
+                {!formData.agreeToTerms && (touched.terms || errors.terms) && (
+                  <p className="text-sm text-red-600 dark:text-red-400">You must agree to the terms and conditions.</p>
                 )}
 
                 {errors.general && (
@@ -204,6 +338,7 @@ export const NewRegister = () => {
                   variant="success"
                   size="lg"
                   fullWidth
+                  disabled={!isFormValid}
                   isLoading={isLoading}
                 >
                   {isLoading ? 'Creating account...' : 'Create Account'}

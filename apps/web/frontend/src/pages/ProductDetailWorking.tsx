@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -23,6 +23,7 @@ import {
 import { Button, Card, CardBody, Badge } from '../components/ui';
 import { useCartStore } from '../store/cartStore';
 import { useRecentlyViewedStore } from '../store/recentlyViewedStore';
+import { useWishlistStore } from '../store/wishlistStore';
 
 /**
  * Product Detail Page - Working Version
@@ -35,9 +36,9 @@ export const ProductDetailWorking = () => {
   const navigate = useNavigate();
   const { addItem } = useCartStore();
   const addToRecentlyViewed = useRecentlyViewedStore((state) => state.addProduct);
+  const { toggleItem: toggleWishlist, isInWishlist } = useWishlistStore();
 
   const [quantity, setQuantity] = useState(1);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -55,11 +56,36 @@ export const ProductDetailWorking = () => {
     { id: '10', name: 'Smart Home Camera 4K', tagline: 'Crystal-clear home security', category: 'Electronics', price: 199.99, originalPrice: 249.99, rating: 4.7, reviews: 654, stock: 45, images: ['📷', '🔒'] },
     { id: '11', name: 'Running Shoes Pro Elite', tagline: 'Run further with more comfort', category: 'Clothing', price: 159.99, rating: 4.9, reviews: 2345, stock: 120, images: ['👟', '🏅'] },
     { id: '12', name: 'Sunglasses Polarized UV400', tagline: 'Clarity and protection outdoors', category: 'Accessories', price: 89.99, rating: 4.5, reviews: 876, stock: 95, images: ['🕶️', '🌞'] },
-  ] as const;
+    // Personalized recommendation products
+    { id: '13', name: 'Nimbus Run Pro Shoes', tagline: 'Run further with more comfort', category: 'Clothing', price: 118.99, rating: 4.9, reviews: 2345, stock: 12, images: ['👟', '🏃'] },
+    { id: '14', name: 'AeroFit Windbreaker', tagline: 'Lightweight wind and rain protection', category: 'Clothing', price: 89.50, rating: 4.7, reviews: 890, stock: 45, images: ['🧥', '🌬️'] },
+    { id: '15', name: 'Skyline Messenger Bag', tagline: 'Carry with comfort and style', category: 'Accessories', price: 159.99, originalPrice: 189.99, rating: 4.8, reviews: 1203, stock: 0, images: ['👜', '💼'] },
+    { id: '16', name: 'Lumen Smart Lamp', tagline: 'Adjustable brightness and color temperature', category: 'Electronics', price: 134.00, rating: 4.6, reviews: 567, stock: 28, images: ['💡', '🔆'] },
+    // Additional products (some out of stock for wishlist)
+    { id: '17', name: 'Pro Noise-Canceling Earbuds', tagline: 'Crystal-clear audio anywhere', category: 'Electronics', price: 249.99, rating: 4.8, reviews: 432, stock: 0, images: ['🎧', '🔇'] },
+    { id: '18', name: 'Minimalist Leather Wallet', tagline: 'Slim design, RFID protection', category: 'Accessories', price: 64.99, rating: 4.5, reviews: 678, stock: 0, images: ['👛', '💳'] },
+    { id: '19', name: 'CloudComfort Memory Foam Pillow', tagline: 'Wake up feeling refreshed', category: 'Home', price: 49.99, rating: 4.7, reviews: 2109, stock: 85, images: ['🛏️', '☁️'] },
+    { id: '20', name: 'AquaStride Water Bottle 1L', tagline: 'Stay hydrated in style', category: 'Accessories', price: 29.99, rating: 4.6, reviews: 1523, stock: 200, images: ['🥤', '💧'] },
+  ];
 
   const product =
     catalog.find((p) => p.id === (id || '')) ||
     catalog[0];
+
+  // You May Also Like: real products from catalog (same category first, then others), so click opens correct product
+  const youMayAlsoLike = (() => {
+    const others = catalog.filter((p) => p.id !== product.id);
+    const sameCategory = others.filter((p) => p.category === product.category);
+    const rest = others.filter((p) => p.category !== product.category);
+    const ordered = [...sameCategory, ...rest];
+    return ordered.slice(0, 4).map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      rating: p.rating ?? 4.5,
+      image: p.images[0] ?? '✨',
+    }));
+  })();
 
   // Track product view
   useEffect(() => {
@@ -72,8 +98,23 @@ export const ProductDetailWorking = () => {
     });
   }, [product.id]);
 
-  const savings = product.originalPrice - product.price;
-  const discountPercentage = Math.round((savings / product.originalPrice) * 100);
+  const hasDiscount = product.originalPrice != null && product.originalPrice > product.price;
+  const savings = hasDiscount ? product.originalPrice! - product.price : 0;
+  const discountPercentage = hasDiscount ? Math.round((savings / product.originalPrice!) * 100) : 0;
+  const inStock = (product as { stock?: number }).stock !== undefined ? (product as { stock?: number }).stock! > 0 : true;
+  const isFavorite = isInWishlist(product.id);
+
+  const handleAddToWishlist = () => {
+    toggleWishlist({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      originalPrice: product.originalPrice,
+      image: product.images[0],
+      category: product.category,
+      inStock,
+    });
+  };
 
   const handleAddToCart = () => {
     addItem({
@@ -215,55 +256,81 @@ export const ProductDetailWorking = () => {
                 <span className="text-5xl font-bold text-blue-600 dark:text-blue-400">
                   ${product.price}
                 </span>
-                <span className="text-2xl text-gray-400 line-through">${product.originalPrice}</span>
+                {hasDiscount && (
+                  <span className="text-2xl text-gray-400 line-through">${product.originalPrice}</span>
+                )}
               </div>
-              <Badge variant="success" size="lg">
-                Save ${savings} ({discountPercentage}% OFF)
-              </Badge>
+              {hasDiscount && (
+                <Badge variant="success" size="lg">
+                  Save ${savings} ({discountPercentage}% OFF)
+                </Badge>
+              )}
             </div>
 
             {/* Stock */}
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-teal-500 rounded-full animate-pulse" />
-              <span className="text-teal-700 dark:text-teal-300 font-semibold">
-                In Stock - Ships in 1 day
-              </span>
+              {inStock ? (
+                <>
+                  <div className="w-3 h-3 bg-teal-500 rounded-full animate-pulse" />
+                  <span className="text-teal-700 dark:text-teal-300 font-semibold">
+                    In Stock - Ships in 1 day
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="w-3 h-3 bg-amber-500 rounded-full" />
+                  <span className="text-amber-700 dark:text-amber-300 font-semibold">
+                    Out of stock - Add to wishlist for restock alert
+                  </span>
+                </>
+              )}
             </div>
 
-            {/* Quantity */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Quantity</label>
-              <div className="flex items-center border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden w-40">
-                <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-lg font-semibold"
-                >
-                  -
-                </button>
-                <span className="flex-1 text-center font-semibold text-lg">{quantity}</span>
-                <button
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-lg font-semibold"
-                >
-                  +
-                </button>
+            {/* Quantity - only when in stock */}
+            {inStock && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Quantity</label>
+                <div className="flex border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden w-40">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-lg font-semibold"
+                  >
+                    -
+                  </button>
+                  <span className="flex-1 text-center py-3 font-semibold text-lg">{quantity}</span>
+                  <button
+                    onClick={() => setQuantity(Math.min((product as { stock?: number }).stock ?? 99, quantity + 1))}
+                    className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-lg font-semibold"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Actions */}
             <div className="space-y-3">
-              <Button variant="success" size="lg" fullWidth onClick={handleAddToCart}>
-                <ShoppingCart className="w-5 h-5 mr-2" />
-                Add to Cart
-              </Button>
-              <Button variant="primary" size="lg" fullWidth onClick={handleBuyNow}>
-                <Zap className="w-5 h-5 mr-2" />
-                Buy Now - Fast Checkout
-              </Button>
+              {inStock ? (
+                <>
+                  <Button variant="success" size="lg" fullWidth onClick={handleAddToCart}>
+                    <ShoppingCart className="w-5 h-5 mr-2" />
+                    Add to Cart
+                  </Button>
+                  <Button variant="primary" size="lg" fullWidth onClick={handleBuyNow}>
+                    <Zap className="w-5 h-5 mr-2" />
+                    Buy Now - Fast Checkout
+                  </Button>
+                </>
+              ) : (
+                <Button variant="primary" size="lg" fullWidth onClick={handleAddToWishlist} className="bg-amber-600 hover:bg-amber-500">
+                  <Heart className="w-5 h-5 mr-2 fill-current" />
+                  Add to Wishlist for Restock Alert
+                </Button>
+              )}
               <div className="grid grid-cols-2 gap-3">
-                <Button variant="ghost" onClick={() => setIsFavorite(!isFavorite)}>
+                <Button variant="ghost" onClick={handleAddToWishlist}>
                   <Heart className={`w-5 h-5 mr-2 ${isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
-                  {isFavorite ? 'Saved' : 'Save'}
+                  {isFavorite ? 'In Wishlist' : 'Add to Wishlist'}
                 </Button>
                 <Button variant="ghost">
                   <Share2 className="w-5 h-5 mr-2" />
@@ -463,33 +530,30 @@ export const ProductDetailWorking = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { id: '2', name: 'Wireless Earbuds Pro', price: 199.99, rating: 4.7, image: '🎵' },
-              { id: '3', name: 'Bluetooth Speaker', price: 449.99, rating: 4.6, image: '🔊' },
-              { id: '4', name: 'Studio Headphones', price: 349.99, rating: 4.9, image: '🎤' },
-              { id: '5', name: 'Portable Speaker', price: 279.99, rating: 4.8, image: '📻' },
-            ].map((item) => (
-              <Card key={item.id} hover className="group cursor-pointer">
-                <CardBody className="p-0">
-                  <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-t-xl flex items-center justify-center">
-                    <motion.span className="text-8xl" whileHover={{ scale: 1.1, rotate: 5 }}>
-                      {item.image}
-                    </motion.span>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">
-                      {item.name}
-                    </h3>
-                    <div className="flex justify-between items-center">
-                      <span className="text-2xl font-bold text-blue-600">${item.price}</span>
-                      <div className="flex items-center">
-                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                        <span className="text-sm ml-1">{item.rating}</span>
+            {youMayAlsoLike.map((item) => (
+              <Link key={item.id} to={`/products/${item.id}`} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-xl">
+                <Card hover className="group cursor-pointer h-full">
+                  <CardBody className="p-0">
+                    <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-t-xl flex items-center justify-center">
+                      <motion.span className="text-8xl" whileHover={{ scale: 1.1, rotate: 5 }}>
+                        {item.image}
+                      </motion.span>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {item.name}
+                      </h3>
+                      <div className="flex justify-between items-center">
+                        <span className="text-2xl font-bold text-blue-600">${item.price}</span>
+                        <div className="flex items-center">
+                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                          <span className="text-sm ml-1">{item.rating}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardBody>
-              </Card>
+                  </CardBody>
+                </Card>
+              </Link>
             ))}
           </div>
         </div>

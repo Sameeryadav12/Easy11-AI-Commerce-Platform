@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   ShoppingBag,
   User,
@@ -22,8 +22,26 @@ import {
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
 import { useRewardsStore } from '../store/rewardsStore';
+import { useOrdersStore, type Order } from '../store/ordersStore';
+import { useAddressStore } from '../store/addressStore';
+import { usePaymentStore } from '../store/paymentStore';
 import { Button, Loading } from '../components/ui';
 import toast from 'react-hot-toast';
+import type { Address } from '../types/dashboard';
+import {
+  validateCardNumber,
+  validateCardholderName,
+  validateExpiry,
+  validateCVV,
+  detectCardBrand,
+  cvvLengthForBrand,
+  type CardBrand,
+} from '../utils/cardValidation';
+import { validateShippingForm } from '../utils/checkoutValidation';
+import { computeOrderPoints } from '../utils/rewardsConstants';
+import { createOrder as createOrderAPI } from '../services/ordersAPI';
+import { FREE_STANDARD_SHIPPING_THRESHOLD } from '../utils/shippingConstants';
+import { TIER_POINTS_MULTIPLIER } from '../store/rewardsStore';
 
 interface ShippingInfo {
   email: string;
@@ -50,8 +68,18 @@ interface PaymentInfo {
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { items, getSubtotal, getTax, getShipping, getTotal, discountAmount, clearCart } = useCartStore();
-  const { points, canRedeemPoints, redeemPoints } = useRewardsStore();
+  const { items, getSubtotal, discountAmount, discountCode, clearCart } = useCartStore();
+  const { points, canRedeemPoints, redeemPoints, addPendingPoints, tier } = useRewardsStore();
+  const addOrder = useOrdersStore((s) => s.addOrder);
+  const orders = useOrdersStore((s) => s.orders);
+  const addAddress = useAddressStore((s) => s.addAddress);
+  const addresses = useAddressStore((s) => s.addresses);
+  const paymentMethods = usePaymentStore((s) => s.methods);
+  const addPaymentMethod = usePaymentStore((s) => s.addMethod);
+
+  // Selected saved address (null = use form / new address)
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const hasPrefilledStep2 = useRef(false);
   
   const [currentStep, setCurrentStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -83,24 +111,94 @@ export default function CheckoutPage() {
     billingSame: true,
   });
 
-  const subtotal = getSubtotal();
-  const tax = getTax();
-  const shippingCost = getShipping();
-  const discount = discountAmount;
-  const total = getTotal();
+  // selectedPaymentMethodId: null = enter new card; string = use saved card; undefined = use computed default
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null | undefined>(undefined);
 
-  // Delivery options
+  // Compute default: default card, else newest, else null (Enter new card)
+  const defaultPaymentMethodId =
+    paymentMethods.length > 0
+      ? (paymentMethods.find((m) => m.is_default) ||
+          [...paymentMethods].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )[0])?.id ?? null
+      : null;
+  const effectivePaymentMethodId = selectedPaymentMethodId ?? defaultPaymentMethodId;
+  const [cardErrors, setCardErrors] = useState<{ cardNumber?: string; cardName?: string; expiryDate?: string; cvv?: string }>({});
+  const [shippingErrors, setShippingErrors] = useState<Partial<Record<string, string>>>({});
+  const lastSubmitTime = useRef(0);
+  const SUBMIT_COOLDOWN_MS = 3000;
+
+  const subtotal = Math.max(0, Number(getSubtotal()) || 0);
+  const discount = Math.max(0, Number(discountAmount) || 0);
+
+  // Delivery options - customer chooses; shipping cost comes from selection
   const deliveryOptions = {
     standard: { cost: 0, days: '5-7', label: 'Standard Shipping' },
     express: { cost: 9.99, days: '2-3', label: 'Express Shipping' },
     sameday: { cost: 19.99, days: '1', label: 'Same Day Delivery' },
   };
 
+  // Shipping cost from customer's chosen delivery option (free standard over threshold)
+  const selectedOption = deliveryOptions[selectedDelivery] ?? deliveryOptions.standard;
+  const shippingCost =
+    selectedDelivery === 'standard' && subtotal >= FREE_STANDARD_SHIPPING_THRESHOLD ? 0 : selectedOption.cost;
+
+  // Australia GST: 10% on (subtotal - discount + shipping) — product and shipping are taxable
+  const taxableAmount = Math.max(0, subtotal - discount + shippingCost);
+  const tax = Math.round(taxableAmount * 0.1 * 100) / 100;
+  const total = Math.max(0, subtotal - discount + shippingCost + tax);
+
   // Redirect if cart is empty
   if (items.length === 0) {
     navigate('/cart');
     return null;
   }
+
+  // Pre-fill with default saved address only when first entering step 2 (don't overwrite "Enter new address")
+  useEffect(() => {
+    if (currentStep === 2 && addresses.length > 0 && !hasPrefilledStep2.current) {
+      hasPrefilledStep2.current = true;
+      const defaultAddr = addresses.find((a) => a.is_default_shipping) || addresses[0];
+      if (defaultAddr) {
+        setSelectedAddressId(defaultAddr.id);
+        const [firstName, ...rest] = defaultAddr.full_name.split(' ');
+        const lastName = rest.join(' ') || '';
+        setShippingInfo((prev) => ({
+          ...prev,
+          firstName: firstName || prev.firstName,
+          lastName,
+          phone: defaultAddr.phone || prev.phone,
+          address: defaultAddr.line1,
+          apartment: defaultAddr.line2 || '',
+          city: defaultAddr.city,
+          state: defaultAddr.state,
+          zipCode: defaultAddr.postal_code,
+          country: defaultAddr.country || prev.country,
+        }));
+      }
+    }
+    if (currentStep !== 2) {
+      hasPrefilledStep2.current = false;
+    }
+  }, [currentStep, addresses]);
+
+  // Populate shipping form from a saved address
+  const applyAddressToForm = (addr: Address) => {
+    const [firstName, ...rest] = addr.full_name.split(' ');
+    const lastName = rest.join(' ') || '';
+    setShippingInfo((prev) => ({
+      ...prev,
+      firstName: firstName || prev.firstName,
+      lastName,
+      phone: addr.phone || prev.phone,
+      address: addr.line1,
+      apartment: addr.line2 || '',
+      city: addr.city,
+      state: addr.state,
+      zipCode: addr.postal_code,
+      country: addr.country || prev.country,
+    }));
+  };
 
   // Step navigation
   const goToStep = (step: number) => {
@@ -132,51 +230,231 @@ export default function CheckoutPage() {
         return true; // Always allow proceeding (guest checkout)
       
       case 2: // Shipping
-        const required = ['email', 'firstName', 'lastName', 'address', 'city', 'state', 'zipCode'];
-        const isValid = required.every((field) => shippingInfo[field as keyof ShippingInfo].trim() !== '');
-        if (!isValid) {
-          toast.error('Please fill in all required shipping fields');
+        const result = validateShippingForm(shippingInfo);
+        setShippingErrors(result.errors);
+        if (result.valid) {
+          setShippingInfo((prev) => ({ ...prev, ...result.sanitized }));
+          setShippingErrors({});
+        } else {
+          const firstErr = Object.values(result.errors)[0];
+          toast.error(firstErr || 'Please fix the highlighted fields');
         }
-        return isValid;
+        return result.valid;
       
       case 3: // Payment
-        const cardValid = paymentInfo.cardNumber.replace(/\s/g, '').length === 16 &&
-                          paymentInfo.cardName.trim() !== '' &&
-                          paymentInfo.expiryDate.length === 5 &&
-                          paymentInfo.cvv.length === 3;
-        if (!cardValid) {
-          toast.error('Please enter valid payment information');
+        if (effectivePaymentMethodId) {
+          // Using saved card - no form validation
+          return true;
         }
-        return cardValid;
+        const vCard = validateCardNumber(paymentInfo.cardNumber);
+        const vName = validateCardholderName(paymentInfo.cardName);
+        const vExp = validateExpiry(paymentInfo.expiryDate);
+        const vCvv = validateCVV(paymentInfo.cvv, vCard.brand);
+        setCardErrors({
+          cardNumber: vCard.error,
+          cardName: vName.error,
+          expiryDate: vExp.error,
+          cvv: vCvv.error,
+        });
+        if (!vCard.valid || !vName.valid || !vExp.valid || !vCvv.valid) {
+          toast.error(vCard.error || vName.error || vExp.error || vCvv.error || 'Please enter valid payment information');
+          return false;
+        }
+        return true;
       
       default:
         return true;
     }
   };
 
-  // Place Order
+  // Place Order (rate-limited, validate step 2 & 3)
   const handlePlaceOrder = async () => {
-    if (!validateStep(3)) return;
-    
+    const now = Date.now();
+    if (now - lastSubmitTime.current < SUBMIT_COOLDOWN_MS) {
+      toast.error('Please wait a moment before submitting again');
+      return;
+    }
+    if (!validateStep(2) || !validateStep(3)) return;
+    lastSubmitTime.current = now;
+
     setIsProcessing(true);
-    
+
     // Simulate payment processing
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    
+
+    const shippingAddressForApi = {
+      name: `${shippingInfo.firstName} ${shippingInfo.lastName}`.trim(),
+      address: [shippingInfo.address, shippingInfo.apartment].filter(Boolean).join(', '),
+      city: shippingInfo.city,
+      state: shippingInfo.state,
+      zipCode: shippingInfo.zipCode,
+      country: shippingInfo.country,
+    };
+
+    const orderUserId = user?.id ?? 'guest';
+    let newOrder: Order;
+
+    if (user?.id) {
+      try {
+        const created = await createOrderAPI({
+          items: items.map((item) => ({
+            productId: item.id,
+            quantity: Number(item.quantity) || 1,
+            price: Number(item.price) || 0,
+          })),
+          shippingAddress: shippingAddressForApi,
+        });
+        const daysParts = selectedOption.days.match(/\d+/g);
+        const startDays = daysParts ? parseInt(daysParts[0], 10) : 5;
+        const endDays = daysParts && daysParts.length > 1 ? parseInt(daysParts[1], 10) : startDays + 2;
+        const estEnd = new Date();
+        estEnd.setDate(estEnd.getDate() + endDays);
+        const pointsEarned = computeOrderPoints(Math.max(0, Number(getSubtotal()) || 0), TIER_POINTS_MULTIPLIER[tier]);
+        newOrder = {
+          ...created,
+          status: 'confirmed',
+          shippingMethod: selectedOption.label,
+          tax,
+          shipping: shippingCost,
+          discount: discountAmount,
+          paymentMethod: (() => {
+            const pm = effectivePaymentMethodId ? paymentMethods.find((m) => m.id === effectivePaymentMethodId) : null;
+            return pm ? `${pm.brand} ending in ${pm.last4}` : (paymentInfo.cardNumber ? `${detectCardBrand(paymentInfo.cardNumber.replace(/\s/g, ''))} ending in ${paymentInfo.cardNumber.replace(/\s/g, '').slice(-4)}` : 'Credit Card');
+          })(),
+          estimatedDelivery: estEnd.toISOString(),
+          estimatedDeliveryStart: new Date(estEnd.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          estimatedDeliveryEnd: estEnd.toISOString(),
+          pointsEarned,
+          carrier: 'Easy11 Shipping',
+          trackingNumber: `EZ11${created.orderNumber.replace(/-/g, '').slice(-10)}`,
+          ...(discountCode && discountCode.toUpperCase().startsWith('E11REWARD') ? { rewardCouponCode: discountCode } : {}),
+        };
+        addOrder(newOrder, orderUserId);
+      } catch (err: unknown) {
+        toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to create order. Please try again.');
+        setIsProcessing(false);
+        return;
+      }
+    } else {
+      const orderNumber = `E11-${Date.now().toString().slice(-8)}`;
+      const orderId = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const daysParts = selectedOption.days.match(/\d+/g);
+      const startDays = daysParts ? parseInt(daysParts[0], 10) : 5;
+      const endDays = daysParts && daysParts.length > 1 ? parseInt(daysParts[1], 10) : startDays + 2;
+      const estStart = new Date();
+      estStart.setDate(estStart.getDate() + startDays);
+      const estEnd = new Date();
+      estEnd.setDate(estEnd.getDate() + endDays);
+      newOrder = {
+        id: orderId,
+        orderNumber,
+        date: new Date().toISOString(),
+        status: 'confirmed',
+        userId: orderUserId,
+        shippingMethod: selectedOption.label,
+        items: items.map((item) => ({
+          id: item.id,
+          name: item.name,
+          image: item.image,
+          quantity: Number(item.quantity) || 1,
+          price: Number(item.price) || 0,
+          category: item.category,
+        })),
+        subtotal: getSubtotal(),
+        tax,
+        shipping: shippingCost,
+        discount: discountAmount,
+        total,
+        paymentMethod: (() => {
+            const pm = effectivePaymentMethodId ? paymentMethods.find((m) => m.id === effectivePaymentMethodId) : null;
+            return pm ? `${pm.brand} ending in ${pm.last4}` : (paymentInfo.cardNumber ? `${detectCardBrand(paymentInfo.cardNumber.replace(/\s/g, ''))} ending in ${paymentInfo.cardNumber.replace(/\s/g, '').slice(-4)}` : 'Credit Card');
+          })(),
+        shippingAddress: shippingAddressForApi,
+        estimatedDelivery: estEnd.toISOString(),
+        estimatedDeliveryStart: estStart.toISOString(),
+        estimatedDeliveryEnd: estEnd.toISOString(),
+        pointsEarned: computeOrderPoints(Math.max(0, Number(getSubtotal()) || 0), TIER_POINTS_MULTIPLIER[tier]),
+        carrier: 'Easy11 Shipping',
+        trackingNumber: `EZ11${orderNumber.replace(/-/g, '').slice(-10)}`,
+        ...(discountCode && discountCode.toUpperCase().startsWith('E11REWARD') ? { rewardCouponCode: discountCode } : {}),
+      };
+      addOrder(newOrder, orderUserId);
+    }
+
+    const orderId = newOrder.id;
+    const orderNumber = newOrder.orderNumber;
+
+    if (user?.id && newOrder.rewardCouponCode) {
+      const { useRewardCoupon } = await import('../services/rewardsAPI');
+      useRewardCoupon(newOrder.rewardCouponCode, orderId).catch(() => {});
+    }
+
+    const pointsEarned = newOrder.pointsEarned ?? 0;
+    if (pointsEarned > 0) {
+      addPendingPoints(orderId, pointsEarned, `Order #${orderNumber} – Pending`);
+      if (user?.id) {
+        const { addLedgerEarned } = await import('../services/rewardsAPI');
+        addLedgerEarned(orderId, pointsEarned).catch((err) =>
+          console.warn('[Checkout] Failed to sync points to backend:', err)
+        );
+      }
+    }
+
+    // Save card for future use (tokenized: last4 + brand only; never store full number or CVV)
+    if (user?.id && paymentInfo.saveCard && !effectivePaymentMethodId) {
+      const digits = paymentInfo.cardNumber.replace(/\s/g, '');
+      const brand = detectCardBrand(digits);
+      addPaymentMethod({
+        id: `pm_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        user_id: user.id,
+        psp_token: 'tok_mock_' + Date.now(),
+        brand: brand === 'other' ? 'visa' : brand,
+        last4: digits.slice(-4),
+        expiry: paymentInfo.expiryDate.length === 5
+          ? `${paymentInfo.expiryDate.slice(0, 2)}/20${paymentInfo.expiryDate.slice(3)}`
+          : paymentInfo.expiryDate,
+        is_default: paymentMethods.length === 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    // Save shipping address for logged-in users when using a new address (not from saved list)
+    if (user?.id && !selectedAddressId) {
+      const newAddress: Address = {
+        id: `addr_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        user_id: user.id,
+        nickname: 'Shipping address',
+        full_name: `${shippingInfo.firstName} ${shippingInfo.lastName}`.trim(),
+        phone: shippingInfo.phone || '',
+        line1: shippingInfo.address,
+        line2: shippingInfo.apartment || undefined,
+        city: shippingInfo.city,
+        state: shippingInfo.state,
+        country: shippingInfo.country,
+        postal_code: shippingInfo.zipCode,
+        is_default_shipping: true,
+        is_default_billing: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      addAddress(newAddress);
+    }
+
     // Clear cart
     clearCart();
-    
+
     // Navigate to confirmation
     navigate('/checkout/confirmation', {
       state: {
-        orderNumber: `E11-${Date.now().toString().slice(-8)}`,
+        orderNumber,
         total,
         items,
         shippingInfo,
-        deliveryDays: deliveryOptions[selectedDelivery].days,
+        deliveryDays: selectedOption.days,
       },
     });
-    
+
     setIsProcessing(false);
   };
 
@@ -372,6 +650,91 @@ export default function CheckoutPage() {
                     </p>
                   </div>
 
+                  {/* Saved addresses (logged-in users) */}
+                  {user && addresses.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold text-gray-900 dark:text-white">
+                          Use a saved address
+                        </h3>
+                        <Link
+                          to="/account/addresses"
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          Manage addresses
+                        </Link>
+                      </div>
+                      <div className="space-y-2">
+                        {addresses.map((addr) => (
+                          <label
+                            key={addr.id}
+                            className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                              selectedAddressId === addr.id
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500'
+                                : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="saved-address"
+                              checked={selectedAddressId === addr.id}
+                              onChange={() => {
+                                setSelectedAddressId(addr.id);
+                                applyAddressToForm(addr);
+                                setShippingErrors({});
+                              }}
+                              className="mt-1"
+                            />
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white">
+                                {addr.nickname} · {addr.full_name}
+                              </p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                {addr.line1}
+                                {addr.line2 ? `, ${addr.line2}` : ''}, {addr.city}, {addr.state} {addr.postal_code}
+                                {addr.country ? `, ${addr.country}` : ''}
+                              </p>
+                              {addr.phone && (
+                                <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">{addr.phone}</p>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                        <label
+                          className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                            selectedAddressId === null
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500'
+                              : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="saved-address"
+                            checked={selectedAddressId === null}
+                            onChange={() => {
+                              setSelectedAddressId(null);
+                              setShippingInfo((prev) => ({
+                                ...prev,
+                                firstName: user?.name?.split(' ')[0] || '',
+                                lastName: user?.name?.split(' ').slice(1).join(' ') || '',
+                                phone: '',
+                                address: '',
+                                apartment: '',
+                                city: '',
+                                state: '',
+                                zipCode: '',
+                                country: prev.country,
+                              }));
+                              setShippingErrors({});
+                            }}
+                            className="mt-1"
+                          />
+                          <span className="font-medium text-gray-900 dark:text-white">Enter new address</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Contact Information */}
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
@@ -387,27 +750,40 @@ export default function CheckoutPage() {
                           <input
                             type="email"
                             value={shippingInfo.email}
-                            onChange={(e) => setShippingInfo({ ...shippingInfo, email: e.target.value })}
+                            onChange={(e) => {
+                              setShippingInfo({ ...shippingInfo, email: e.target.value.trim() });
+                              if (shippingErrors.email) setShippingErrors((p) => ({ ...p, email: undefined }));
+                            }}
                             placeholder="your@email.com"
-                            className="w-full pl-11 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            maxLength={254}
+                            className={`w-full pl-11 pr-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                              shippingErrors.email ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                            }`}
                           />
                         </div>
+                        {shippingErrors.email && <p className="text-sm text-red-500 mt-1">{shippingErrors.email}</p>}
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Phone Number
+                          Phone Number *
                         </label>
                         <div className="relative">
                           <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                           <input
                             type="tel"
                             value={shippingInfo.phone}
-                            onChange={(e) => setShippingInfo({ ...shippingInfo, phone: e.target.value })}
-                            placeholder="(555) 123-4567"
-                            className="w-full pl-11 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            onChange={(e) => {
+                              setShippingInfo({ ...shippingInfo, phone: e.target.value });
+                              if (shippingErrors.phone) setShippingErrors((p) => ({ ...p, phone: undefined }));
+                            }}
+                            placeholder="+1 555 123 4567"
+                            className={`w-full pl-11 pr-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                              shippingErrors.phone ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                            }`}
                           />
                         </div>
+                        {shippingErrors.phone && <p className="text-sm text-red-500 mt-1">{shippingErrors.phone}</p>}
                       </div>
                     </div>
                   </div>
@@ -425,10 +801,17 @@ export default function CheckoutPage() {
                         <input
                           type="text"
                           value={shippingInfo.firstName}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, firstName: e.target.value })}
+                          onChange={(e) => {
+                            setShippingInfo({ ...shippingInfo, firstName: e.target.value.trim() });
+                            if (shippingErrors.firstName) setShippingErrors((p) => ({ ...p, firstName: undefined }));
+                          }}
                           placeholder="John"
-                          className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          maxLength={80}
+                          className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                            shippingErrors.firstName ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                          }`}
                         />
+                        {shippingErrors.firstName && <p className="text-sm text-red-500 mt-1">{shippingErrors.firstName}</p>}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -437,10 +820,17 @@ export default function CheckoutPage() {
                         <input
                           type="text"
                           value={shippingInfo.lastName}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, lastName: e.target.value })}
+                          onChange={(e) => {
+                            setShippingInfo({ ...shippingInfo, lastName: e.target.value.trim() });
+                            if (shippingErrors.lastName) setShippingErrors((p) => ({ ...p, lastName: undefined }));
+                          }}
                           placeholder="Doe"
-                          className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          maxLength={80}
+                          className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                            shippingErrors.lastName ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                          }`}
                         />
+                        {shippingErrors.lastName && <p className="text-sm text-red-500 mt-1">{shippingErrors.lastName}</p>}
                       </div>
                     </div>
 
@@ -453,11 +843,18 @@ export default function CheckoutPage() {
                         <input
                           type="text"
                           value={shippingInfo.address}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, address: e.target.value })}
+                          onChange={(e) => {
+                            setShippingInfo({ ...shippingInfo, address: e.target.value });
+                            if (shippingErrors.address) setShippingErrors((p) => ({ ...p, address: undefined }));
+                          }}
                           placeholder="123 Main Street"
-                          className="w-full pl-11 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          maxLength={200}
+                          className={`w-full pl-11 pr-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                            shippingErrors.address ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                          }`}
                         />
                       </div>
+                      {shippingErrors.address && <p className="text-sm text-red-500 mt-1">{shippingErrors.address}</p>}
                     </div>
 
                     <div className="mt-4">
@@ -469,13 +866,38 @@ export default function CheckoutPage() {
                         <input
                           type="text"
                           value={shippingInfo.apartment}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, apartment: e.target.value })}
-                          placeholder="Apt 4B"
-                          className="w-full pl-11 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          onChange={(e) => {
+                            setShippingInfo({ ...shippingInfo, apartment: e.target.value });
+                            if (shippingErrors.apartment) setShippingErrors((p) => ({ ...p, apartment: undefined }));
+                          }}
+                          placeholder="Apt 4B, #12B"
+                          maxLength={50}
+                          className={`w-full pl-11 pr-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                            shippingErrors.apartment ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                          }`}
                         />
                       </div>
+                      {shippingErrors.apartment && <p className="text-sm text-red-500 mt-1">{shippingErrors.apartment}</p>}
                     </div>
 
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Country *
+                      </label>
+                      <select
+                        value={shippingInfo.country}
+                        onChange={(e) => {
+                          setShippingInfo({ ...shippingInfo, country: e.target.value });
+                          if (shippingErrors.zipCode) setShippingErrors((p) => ({ ...p, zipCode: undefined }));
+                        }}
+                        className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      >
+                        <option value="United States">United States</option>
+                        <option value="AU">Australia</option>
+                        <option value="CA">Canada</option>
+                        <option value="GB">United Kingdom</option>
+                      </select>
+                    </div>
                     <div className="grid md:grid-cols-3 gap-4 mt-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -484,10 +906,17 @@ export default function CheckoutPage() {
                         <input
                           type="text"
                           value={shippingInfo.city}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, city: e.target.value })}
+                          onChange={(e) => {
+                            setShippingInfo({ ...shippingInfo, city: e.target.value.trim() });
+                            if (shippingErrors.city) setShippingErrors((p) => ({ ...p, city: undefined }));
+                          }}
                           placeholder="New York"
-                          className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          maxLength={100}
+                          className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                            shippingErrors.city ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                          }`}
                         />
+                        {shippingErrors.city && <p className="text-sm text-red-500 mt-1">{shippingErrors.city}</p>}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -496,31 +925,48 @@ export default function CheckoutPage() {
                         <input
                           type="text"
                           value={shippingInfo.state}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, state: e.target.value })}
+                          onChange={(e) => {
+                            setShippingInfo({ ...shippingInfo, state: e.target.value.trim() });
+                            if (shippingErrors.state) setShippingErrors((p) => ({ ...p, state: undefined }));
+                          }}
                           placeholder="NY"
-                          className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          maxLength={100}
+                          className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                            shippingErrors.state ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                          }`}
                         />
+                        {shippingErrors.state && <p className="text-sm text-red-500 mt-1">{shippingErrors.state}</p>}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          ZIP Code *
+                          ZIP / Postcode *
                         </label>
                         <input
                           type="text"
                           value={shippingInfo.zipCode}
-                          onChange={(e) => setShippingInfo({ ...shippingInfo, zipCode: e.target.value })}
-                          placeholder="10001"
-                          className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          onChange={(e) => {
+                            setShippingInfo({ ...shippingInfo, zipCode: e.target.value.trim() });
+                            if (shippingErrors.zipCode) setShippingErrors((p) => ({ ...p, zipCode: undefined }));
+                          }}
+                          placeholder={shippingInfo.country === 'Australia' || shippingInfo.country === 'AU' ? '3000' : '10001'}
+                          maxLength={20}
+                          className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                            shippingErrors.zipCode ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                          }`}
                         />
+                        {shippingErrors.zipCode && <p className="text-sm text-red-500 mt-1">{shippingErrors.zipCode}</p>}
                       </div>
                     </div>
                   </div>
 
                   {/* Delivery Speed */}
                   <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
                       Delivery Speed
                     </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      Free standard shipping on orders over ${FREE_STANDARD_SHIPPING_THRESHOLD}
+                    </p>
                     <div className="space-y-3">
                       {(Object.keys(deliveryOptions) as Array<keyof typeof deliveryOptions>).map((key) => {
                         const option = deliveryOptions[key];
@@ -617,109 +1063,210 @@ export default function CheckoutPage() {
                     </p>
                   </div>
 
-                  {/* Card Information */}
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
-                      Card Information
-                    </h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Card Number *
-                        </label>
-                        <div className="relative">
-                          <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <input
-                            type="text"
-                            value={paymentInfo.cardNumber}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\s/g, '').replace(/(\d{4})/g, '$1 ').trim();
-                              if (value.replace(/\s/g, '').length <= 16) {
-                                setPaymentInfo({ ...paymentInfo, cardNumber: value });
-                              }
-                            }}
-                            placeholder="1234 5678 9012 3456"
-                            maxLength={19}
-                            className="w-full pl-11 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono"
-                          />
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex space-x-1">
-                            <span className="text-2xl">💳</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Cardholder Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={paymentInfo.cardName}
-                          onChange={(e) => setPaymentInfo({ ...paymentInfo, cardName: e.target.value })}
-                          placeholder="John Doe"
-                          className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Expiry Date *
+                  {/* Saved cards (logged-in users) */}
+                  {user && paymentMethods.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-3">
+                        Use a saved card
+                      </h3>
+                      <div className="space-y-2">
+                        {paymentMethods.map((pm) => (
+                          <label
+                            key={pm.id}
+                            className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                              effectivePaymentMethodId === pm.id
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500'
+                                : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="saved-card"
+                              checked={effectivePaymentMethodId === pm.id}
+                              onChange={() => {
+                                setSelectedPaymentMethodId(pm.id);
+                                setCardErrors({});
+                              }}
+                              className="form-radio"
+                            />
+                            <CreditCard className="w-5 h-5 text-gray-500" />
+                            <span className="font-medium text-gray-900 dark:text-white capitalize">
+                              {pm.brand} •••• {pm.last4}
+                            </span>
+                            <span className="text-sm text-gray-500">Expires {pm.expiry}</span>
                           </label>
+                        ))}
+                        <label
+                          className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                            effectivePaymentMethodId === null
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500'
+                              : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                          }`}
+                        >
                           <input
-                            type="text"
-                            value={paymentInfo.expiryDate}
-                            onChange={(e) => {
-                              let value = e.target.value.replace(/\D/g, '');
-                              if (value.length >= 2) {
-                                value = value.slice(0, 2) + '/' + value.slice(2, 4);
-                              }
-                              if (value.length <= 5) {
-                                setPaymentInfo({ ...paymentInfo, expiryDate: value });
-                              }
+                            type="radio"
+                            name="saved-card"
+                            checked={effectivePaymentMethodId === null}
+                            onChange={() => {
+                              setSelectedPaymentMethodId(null);
+                              setCardErrors({});
                             }}
-                            placeholder="MM/YY"
-                            maxLength={5}
-                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono"
+                            className="form-radio"
                           />
-                        </div>
+                          <span className="font-medium text-gray-900 dark:text-white">Enter new card</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Card Information (when entering new card) */}
+                  {effectivePaymentMethodId === null && (
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
+                        Card Information
+                      </h3>
+                      <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            CVV *
+                            Card Number *
                           </label>
                           <div className="relative">
+                            <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                             <input
                               type="text"
-                              value={paymentInfo.cvv}
+                              inputMode="numeric"
+                              autoComplete="cc-number"
+                              value={paymentInfo.cardNumber}
                               onChange={(e) => {
-                                const value = e.target.value.replace(/\D/g, '');
-                                if (value.length <= 3) {
-                                  setPaymentInfo({ ...paymentInfo, cvv: value });
+                                const raw = e.target.value.replace(/\D/g, '');
+                                const brand = detectCardBrand(raw);
+                                const maxLen = brand === 'amex' ? 15 : 16;
+                                if (raw.length <= maxLen) {
+                                  const formatted = brand === 'amex'
+                                    ? raw.replace(/(\d{4})(?=\d)/g, '$1 ').trim()
+                                    : raw.replace(/(\d{4})/g, '$1 ').trim();
+                                  setPaymentInfo({ ...paymentInfo, cardNumber: formatted });
+                                  setCardErrors((prev) => ({ ...prev, cardNumber: undefined }));
                                 }
                               }}
-                              placeholder="123"
-                              maxLength={3}
-                              className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono"
+                              placeholder="1234 5678 9012 3456"
+                              maxLength={19}
+                              className={`w-full pl-11 pr-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono ${
+                                cardErrors.cardNumber ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                              }`}
                             />
-                            <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            {paymentInfo.cardNumber && (
+                              <span className="absolute right-10 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-500 capitalize">
+                                {detectCardBrand(paymentInfo.cardNumber.replace(/\s/g, ''))}
+                              </span>
+                            )}
+                          </div>
+                          {cardErrors.cardNumber && (
+                            <p className="text-sm text-red-500 mt-1">{cardErrors.cardNumber}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Cardholder Name *
+                          </label>
+                          <input
+                            type="text"
+                            autoComplete="cc-name"
+                            value={paymentInfo.cardName}
+                            onChange={(e) => {
+                              setPaymentInfo({ ...paymentInfo, cardName: e.target.value });
+                              setCardErrors((prev) => ({ ...prev, cardName: undefined }));
+                            }}
+                            placeholder="John Doe"
+                            className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                              cardErrors.cardName ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                            }`}
+                          />
+                          {cardErrors.cardName && (
+                            <p className="text-sm text-red-500 mt-1">{cardErrors.cardName}</p>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Expiry Date * (MM/YY)
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              autoComplete="cc-exp"
+                              value={paymentInfo.expiryDate}
+                              onChange={(e) => {
+                                let value = e.target.value.replace(/\D/g, '');
+                                if (value.length >= 2) value = value.slice(0, 2) + '/' + value.slice(2, 4);
+                                if (value.length <= 5) {
+                                  setPaymentInfo({ ...paymentInfo, expiryDate: value });
+                                  setCardErrors((prev) => ({ ...prev, expiryDate: undefined }));
+                                }
+                              }}
+                              placeholder="MM/YY"
+                              maxLength={5}
+                              className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono ${
+                                cardErrors.expiryDate ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                              }`}
+                            />
+                            {cardErrors.expiryDate && (
+                              <p className="text-sm text-red-500 mt-1">{cardErrors.expiryDate}</p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              CVV * (Security Code)
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="password"
+                                inputMode="numeric"
+                                autoComplete="cc-csc"
+                                value={paymentInfo.cvv}
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/\D/g, '');
+                                  const brand = detectCardBrand(paymentInfo.cardNumber.replace(/\s/g, ''));
+                                  const maxLen = cvvLengthForBrand(brand);
+                                  if (value.length <= maxLen) {
+                                    setPaymentInfo({ ...paymentInfo, cvv: value });
+                                    setCardErrors((prev) => ({ ...prev, cvv: undefined }));
+                                  }
+                                }}
+                                placeholder={detectCardBrand(paymentInfo.cardNumber.replace(/\s/g, '')) === 'amex' ? '4 digits' : '123'}
+                                maxLength={4}
+                                className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono pr-12 ${
+                                  cardErrors.cvv ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                                }`}
+                              />
+                              <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            </div>
+                            {cardErrors.cvv && (
+                              <p className="text-sm text-red-500 mt-1">{cardErrors.cvv}</p>
+                            )}
+                            <p className="text-xs text-gray-500 mt-0.5">Never stored. For verification only.</p>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Save Card Checkbox */}
-                  <label className="flex items-center space-x-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={paymentInfo.saveCard}
-                      onChange={(e) => setPaymentInfo({ ...paymentInfo, saveCard: e.target.checked })}
-                      className="form-checkbox h-5 w-5 text-blue-600 rounded"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Save this card for future purchases
-                    </span>
-                  </label>
+                  {/* Save Card Checkbox (only when entering new card) */}
+                  {effectivePaymentMethodId === null && (
+                    <label className="flex items-center space-x-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={paymentInfo.saveCard}
+                        onChange={(e) => setPaymentInfo({ ...paymentInfo, saveCard: e.target.checked })}
+                        className="form-checkbox h-5 w-5 text-blue-600 rounded"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        Save this card for future purchases (only last 4 digits + card type stored)
+                      </span>
+                    </label>
+                  )}
 
                   {/* Security Notice */}
                   <div className="flex items-start space-x-3 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
@@ -781,12 +1328,12 @@ export default function CheckoutPage() {
                             <p className="font-semibold text-gray-900 dark:text-white truncate">
                               {item.name}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Qty: {item.quantity}
-                            </p>
-                          </div>
-                          <p className="font-semibold text-gray-900 dark:text-white">
-                            ${(item.price * item.quantity).toFixed(2)}
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Qty: {Number(item.quantity) || 1}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      ${((Number(item.price) || 0) * (Number(item.quantity) || 1)).toFixed(2)}
                           </p>
                         </div>
                       ))}
@@ -823,9 +1370,23 @@ export default function CheckoutPage() {
                         Payment Method
                       </h3>
                       <p className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
-                        <span className="block">Card ending in {paymentInfo.cardNumber.slice(-4)}</span>
-                        <span className="block">{paymentInfo.cardName}</span>
-                        <span className="block">Expires {paymentInfo.expiryDate}</span>
+                        {effectivePaymentMethodId ? (
+                          (() => {
+                            const pm = paymentMethods.find((m) => m.id === effectivePaymentMethodId);
+                            return pm ? (
+                              <>
+                                <span className="block capitalize">{pm.brand} ending in {pm.last4}</span>
+                                <span className="block">Expires {pm.expiry}</span>
+                              </>
+                            ) : null;
+                          })()
+                        ) : (
+                          <>
+                            <span className="block">Card ending in {paymentInfo.cardNumber.replace(/\s/g, '').slice(-4)}</span>
+                            <span className="block">{paymentInfo.cardName}</span>
+                            <span className="block">Expires {paymentInfo.expiryDate}</span>
+                          </>
+                        )}
                       </p>
                       <button
                         onClick={() => setCurrentStep(3)}
@@ -843,15 +1404,15 @@ export default function CheckoutPage() {
                         <Truck className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                         <div>
                           <p className="font-semibold text-gray-900 dark:text-white">
-                            {deliveryOptions[selectedDelivery].label}
+                            {selectedOption.label}
                           </p>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Estimated delivery: {deliveryOptions[selectedDelivery].days} business days
+                            Estimated delivery: {selectedOption.days} business days
                           </p>
                         </div>
                       </div>
                       <span className="font-semibold text-gray-900 dark:text-white">
-                        {deliveryOptions[selectedDelivery].cost === 0 ? 'FREE' : `$${deliveryOptions[selectedDelivery].cost}`}
+                        {shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}
                       </span>
                     </div>
                   </div>
@@ -908,11 +1469,11 @@ export default function CheckoutPage() {
                         {item.name}
                       </p>
                       <p className="text-gray-500 dark:text-gray-400">
-                        Qty: {item.quantity}
+                        Qty: {Number(item.quantity) || 1}
                       </p>
                     </div>
                     <p className="font-semibold text-gray-900 dark:text-white">
-                      ${(item.price * item.quantity).toFixed(2)}
+                      ${((Number(item.price) || 0) * (Number(item.quantity) || 1)).toFixed(2)}
                     </p>
                   </div>
                 ))}
@@ -982,7 +1543,7 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 <div className="flex justify-between text-gray-700 dark:text-gray-300">
-                  <span>Shipping</span>
+                  <span>Shipping ({selectedOption.label})</span>
                   <span className="font-semibold">
                     {shippingCost === 0 ? (
                       <span className="text-teal-600 dark:text-teal-400">FREE</span>
@@ -997,6 +1558,11 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {items.length > 0 && total <= 0 && (
+                <p className="text-sm text-red-500 py-2">
+                  We couldn&apos;t calculate total—refresh or contact support.
+                </p>
+              )}
               <div className="flex justify-between items-center text-xl font-bold text-gray-900 dark:text-white pt-4 border-t-2 border-gray-200 dark:border-gray-700">
                 <span>Total</span>
                 <span className="text-2xl text-blue-600 dark:text-blue-400">

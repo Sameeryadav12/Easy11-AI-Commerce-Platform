@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -16,23 +16,26 @@ import { Button, Card, CardBody, CardHeader } from '../../components/ui';
 import { TierProgressCard } from '../../components/account/rewards/TierProgressCard';
 import { BadgesShowcase } from '../../components/account/rewards/BadgesShowcase';
 import { useRewardsStore } from '../../store/rewardsStore';
+import { useOrdersStore } from '../../store/ordersStore';
 import type { RewardTier } from '../../types/rewards';
 
 const tierBenefits: Record<RewardTier, string[]> = {
   Silver: [
-    'Standard shipping included',
-    '1× points multiplier on every purchase',
-    'Early look at seasonal drops',
+    '1 point = $1 spent on subtotal',
+    '1× points multiplier',
+    'Reach Gold at 2,500 points (12-month rolling)',
   ],
   Gold: [
-    'Free returns & priority support',
-    '2× multiplier on weekly spotlight categories',
-    'Early sale access + member-only events',
+    '1.05× points on every order',
+    'Reach Platinum at 7,500 points',
   ],
   Platinum: [
-    'Express shipping upgrades on every order',
-    '4× multiplier weekends and concierge styling',
-    'Exclusive product access + anniversary gifts',
+    '1.1× points on every order',
+    'Reach Diamond at 25,000 points',
+  ],
+  Diamond: [
+    '1.25× points on every order',
+    'Top tier benefits',
   ],
 };
 
@@ -64,15 +67,40 @@ export default function RewardsPage() {
   }));
   const refreshRewardsExperience = useRewardsStore((state) => state.refreshRewardsExperience);
   const getPointsToNextTier = useRewardsStore((state) => state.getPointsToNextTier);
+  const ledger = useRewardsStore((state) => state.ledger);
+  const syncFromOrders = useRewardsStore((state) => state.syncFromOrders);
+  const orders = useOrdersStore((state) => state.orders);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    refreshRewardsExperience();
+    let cancelled = false;
+    setIsLoading(true);
+    Promise.resolve(refreshRewardsExperience()).finally(() => {
+      if (!cancelled) setIsLoading(false);
+    });
+    return () => { cancelled = true; };
   }, [refreshRewardsExperience]);
+
+  // Account-based: backfill ledger from existing orders when ledger is empty (e.g. after login).
+  useEffect(() => {
+    if (ledger.length === 0 && orders.length > 0) {
+      syncFromOrders(orders);
+    }
+  }, [ledger.length, orders, syncFromOrders]);
 
   const pointsToNext = getPointsToNextTier();
   const recentTransactions = useMemo(() => transactions.slice(0, 4), [transactions]);
   const challengeHighlight =
     challenges.daily[0] ?? challenges.weekly[0] ?? challenges.seasonal[0] ?? null;
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+        <p className="mt-3 text-gray-600 dark:text-gray-400">Loading rewards…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10">
@@ -104,6 +132,7 @@ export default function RewardsPage() {
           <TierProgressCard
             tier={tier}
             points={points}
+            pendingPoints={summary.pendingPoints}
             pointsToNext={pointsToNext}
             tierProgress={tierProgress}
             streakMultiplier={streak.multiplier}
@@ -225,7 +254,7 @@ export default function RewardsPage() {
                 ${walletBalance.toFixed(2)}
               </p>
               <div className="grid gap-2 text-xs text-gray-600 dark:text-gray-400">
-                <span>Pending EasyPoints · {summary.pendingPoints.toLocaleString()} pts</span>
+                <span>Pending · {summary.pendingPoints.toLocaleString()} pts (available after delivery)</span>
                 <span>
                   Estimated value · ${summary.estimatedValue.toFixed(2)}
                 </span>
@@ -238,9 +267,11 @@ export default function RewardsPage() {
                   <span>No points expiring in this quarter.</span>
                 )}
               </div>
-              <Button variant="secondary" fullWidth>
-                Manage redemptions
-              </Button>
+              <Link to="/account/rewards/redemptions">
+                <Button variant="secondary" fullWidth>
+                  Manage redemptions
+                </Button>
+              </Link>
             </CardBody>
           </Card>
 
@@ -320,7 +351,7 @@ export default function RewardsPage() {
                 </div>
               </div>
               <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                {tierBenefits[tier].map((benefit) => (
+                {(tierBenefits[tier] ?? tierBenefits.Silver).map((benefit) => (
                   <li key={benefit} className="flex items-center gap-2">
                     <span className="text-emerald-500">•</span>
                     {benefit}

@@ -128,8 +128,8 @@ export default function RegisterPage() {
         icon: '✅',
       });
 
-      // Navigate to account dashboard
-      navigate('/account', { replace: true });
+      // Navigate to home (logged-in storefront)
+      navigate('/', { replace: true });
     } catch (error: any) {
       // Handle API errors
       const errorMessage = error.response?.data?.message || 

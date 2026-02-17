@@ -15,6 +15,105 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        function log(payload) {
+          try {
+            var body = JSON.stringify(payload);
+            if (navigator && typeof navigator.sendBeacon === 'function') {
+              navigator.sendBeacon(
+                '/api/v1/__debug/log',
+                new Blob([body], { type: 'application/json' })
+              );
+              return;
+            }
+            fetch('/api/v1/__debug/log', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: body,
+            }).catch(function () {});
+          } catch (e) {}
+        }
+
+        try {
+          var payload = {
+            sessionId: 'debug-session',
+            runId: 'run6',
+            hypothesisId: 'C',
+            location: 'index.html:inline',
+            message: 'index loaded',
+            data: { href: window.location.href },
+            timestamp: Date.now(),
+          };
+          log(payload);
+
+          // Also capture early runtime errors before React mounts.
+          window.addEventListener('error', function (event) {
+            log({
+              sessionId: 'debug-session',
+              runId: 'run6',
+              hypothesisId: 'D',
+              location: 'index.html:window.error',
+              message: 'window.error',
+              data: {
+                message: event && event.message,
+                filename: event && event.filename,
+                lineno: event && event.lineno,
+                colno: event && event.colno,
+              },
+              timestamp: Date.now(),
+            });
+          });
+
+          window.addEventListener('unhandledrejection', function (event) {
+            var reason = event && event.reason;
+            log({
+              sessionId: 'debug-session',
+              runId: 'run6',
+              hypothesisId: 'D',
+              location: 'index.html:window.unhandledrejection',
+              message: 'window.unhandledrejection',
+              data: {
+                reasonMessage: (reason && reason.message) || String(reason),
+              },
+              timestamp: Date.now(),
+            });
+          });
+
+          // Capture user interaction even if React handlers fail.
+          var interactionCount = 0;
+          function logInteraction(kind, evt) {
+            try {
+              interactionCount++;
+              if (interactionCount > 8) return;
+              var t = evt && evt.target;
+              log({
+                sessionId: 'debug-session',
+                runId: 'run6',
+                hypothesisId: 'C',
+                location: 'index.html:interaction',
+                message: kind,
+                data: {
+                  href: window.location.href,
+                  tag: t && t.tagName,
+                  id: t && t.id,
+                  className: t && t.className,
+                  type: t && t.type,
+                  name: t && t.name,
+                },
+                timestamp: Date.now(),
+              });
+            } catch (e) {}
+          }
+          window.addEventListener('click', function (e) {
+            logInteraction('click', e);
+          }, true);
+          window.addEventListener('submit', function (e) {
+            logInteraction('submit', e);
+          }, true);
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

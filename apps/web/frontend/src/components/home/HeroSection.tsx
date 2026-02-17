@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Sparkles, Shield, Zap, Heart, TrendingUp } from 'lucide-react';
+import { ArrowRight, Shield, Zap, Heart, TrendingUp } from 'lucide-react';
 import { Button } from '../ui';
 
 interface HeroSlide {
@@ -26,25 +27,25 @@ export const HeroSection: React.FC = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Hero slide variants (can be fetched from API for personalization)
+  // Hero slide variants – shopping-focused copy, no feature hype
   const slides: HeroSlide[] = [
     {
       id: 1,
       headline: 'Shop Smarter.',
-      subheadline: 'Personalized by AI.',
-      description: 'Discover products tailored just for you with our intelligent recommendation engine. Trusted by thousands of happy shoppers.',
+      subheadline: 'Deals that fit you.',
+      description: 'Find what you need with tailored picks and fast checkout. Trusted by thousands of shoppers.',
       primaryCTA: 'Start Shopping',
-      secondaryCTA: 'Explore AI Assistant',
+      secondaryCTA: 'All Products',
       primaryLink: '/products',
-      secondaryLink: '/ai-assistant',
+      secondaryLink: '/products',
       gradient: 'from-navy-500 via-blue-600 to-blue-700',
-      icon: <Sparkles className="w-6 h-6" />,
+      icon: <TrendingUp className="w-6 h-6" />,
     },
     {
       id: 2,
       headline: 'Spring Sale.',
-      subheadline: 'AI Picks Just for You.',
-      description: 'Exclusive deals on products you\'ll love. Our AI has selected the perfect items based on your preferences.',
+      subheadline: 'Limited-time deals.',
+      description: 'Exclusive offers on top picks. Save on electronics, clothing, and more.',
       primaryCTA: 'View Spring Deals',
       secondaryCTA: 'See All Products',
       primaryLink: '/products?sale=spring',
@@ -55,8 +56,8 @@ export const HeroSection: React.FC = () => {
     {
       id: 3,
       headline: 'Sustainable Style.',
-      subheadline: 'Smarter Shopping.',
-      description: 'Shop eco-friendly products without compromising on quality. Make a difference with every purchase.',
+      subheadline: 'Eco-friendly picks.',
+      description: 'Shop eco-friendly products without compromising on quality.',
       primaryCTA: 'Shop Sustainable',
       secondaryCTA: 'Learn More',
       primaryLink: '/products?category=sustainable',
@@ -67,14 +68,14 @@ export const HeroSection: React.FC = () => {
     {
       id: 4,
       headline: 'New Arrivals.',
-      subheadline: 'Curated for You.',
-      description: 'Be the first to discover the latest products. Fresh inventory added daily, selected by our AI.',
+      subheadline: 'Fresh inventory.',
+      description: 'Latest products added daily. See what\'s new.',
       primaryCTA: 'See New Items',
       secondaryCTA: 'All Products',
       primaryLink: '/products?new=true',
       secondaryLink: '/products',
       gradient: 'from-violet-600 via-purple-600 to-fuchsia-600',
-      icon: <Sparkles className="w-6 h-6" />,
+      icon: <TrendingUp className="w-6 h-6" />,
     },
   ];
 
@@ -136,8 +137,8 @@ export const HeroSection: React.FC = () => {
         />
       </div>
 
-      <div className="container-custom relative z-10 py-20 lg:py-32">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <div className="container-custom relative z-10 py-12 lg:py-20">
+        <div className="grid lg:grid-cols-2 gap-10 items-center">
           {/* Left Side - Content */}
           <AnimatePresence mode="wait">
             <motion.div
@@ -148,23 +149,12 @@ export const HeroSection: React.FC = () => {
               transition={{ duration: 0.5 }}
               className="text-center lg:text-left"
             >
-              {/* Badge */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 }}
-                className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-6"
-              >
-                {slide.icon}
-                <span className="text-sm font-medium">AI-Powered Shopping Experience</span>
-              </motion.div>
-
               {/* Headline */}
               <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="text-5xl lg:text-6xl xl:text-7xl font-heading font-extrabold mb-6 leading-tight"
+                transition={{ delay: 0.2 }}
+                className="text-4xl lg:text-5xl xl:text-6xl font-heading font-extrabold mb-4 leading-tight"
               >
                 {slide.headline}
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-sky-300 mt-2">
@@ -176,8 +166,8 @@ export const HeroSection: React.FC = () => {
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="text-xl lg:text-2xl text-blue-100 mb-8 max-w-2xl mx-auto lg:mx-0"
+                transition={{ delay: 0.3 }}
+                className="text-lg lg:text-xl text-blue-100 mb-6 max-w-xl mx-auto lg:mx-0"
               >
                 {slide.description}
               </motion.p>
@@ -230,33 +220,31 @@ export const HeroSection: React.FC = () => {
             </motion.div>
           </AnimatePresence>
 
-          {/* Right Side - Visual */}
+          {/* Right Side - Shop by category (each tile links somewhere) */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4, duration: 0.6 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
             className="hidden lg:block"
           >
-            <div className="relative">
-              {/* Glow Effect */}
-              <div className="absolute inset-0 bg-gradient-to-br from-teal-400 to-sky-400 rounded-3xl blur-3xl opacity-30 animate-pulse" />
-              
-              {/* Product Grid */}
-              <div className="relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20">
-                <div className="grid grid-cols-2 gap-4">
-                  {['💻', '🎧', '⌚', '📱'].map((emoji, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.6 + i * 0.1 }}
-                      className="aspect-square bg-white/20 rounded-2xl flex items-center justify-center hover:scale-105 hover:bg-white/30 transition-all cursor-pointer"
-                      whileHover={{ rotate: [0, -5, 5, 0] }}
-                    >
-                      <span className="text-6xl">{emoji}</span>
-                    </motion.div>
-                  ))}
-                </div>
+            <div className="relative bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+              <p className="text-sm font-medium text-blue-100 mb-4">Shop by category</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { emoji: '💻', label: 'Electronics', to: '/products?category=electronics' },
+                  { emoji: '🎧', label: 'Audio', to: '/products?category=electronics' },
+                  { emoji: '⌚', label: 'Watches', to: '/products?category=accessories' },
+                  { emoji: '📱', label: 'Phones', to: '/products?category=electronics' },
+                ].map(({ emoji, label, to }, i) => (
+                  <Link
+                    key={i}
+                    to={to}
+                    className="aspect-square bg-white/20 rounded-xl flex flex-col items-center justify-center hover:scale-[1.02] hover:bg-white/30 transition-all cursor-pointer text-white no-underline"
+                  >
+                    <span className="text-4xl mb-1">{emoji}</span>
+                    <span className="text-xs font-medium">{label}</span>
+                  </Link>
+                ))}
               </div>
             </div>
           </motion.div>

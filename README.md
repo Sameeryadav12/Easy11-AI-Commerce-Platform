@@ -2,9 +2,30 @@
 
 > **A secure, AI-driven, full-stack e-commerce and analytics ecosystem combining data engineering, machine learning, and scalable web technologies.**
 
-[![CI/CD](https://github.com/ocean-sameer/easy11/actions/workflows/ci.yml/badge.svg)](https://github.com/ocean-sameer/easy11/actions)
-[![Test Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)](./frontend)
-[![Security](https://img.shields.io/badge/security-0%20critical-green)](https://github.com/ocean-sameer/easy11/security/advisories)
+**Repository:** [github.com/Sameeryadav12/Easy11-AI-Commerce-Platform](https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform)
+
+---
+
+## Documentation
+
+| Link | Description |
+|------|-------------|
+| [**Run the app**](./RUN.md) | One-page guide: start full stack or app-only, default logins. |
+| [**Full documentation**](./docs/README.md) | Single index for all docs: getting started, architecture, runbooks, compliance, sprints, reference. |
+| [**Deployment guide**](./docs/DEPLOYMENT_GUIDE.md) | Deploy customer site (Vercel), API (Render), and DB (Neon); demo user flow; deployment diagram. |
+| [**Deploy step-by-step**](./docs/DEPLOY_STEP_BY_STEP.md) | Detailed walkthrough: Neon → Render → Vercel (for new accounts). |
+
+---
+
+## Live demo (deployed app)
+
+If you're viewing a **deployed** version of this app: the **API may take a few seconds to wake up** on first load (typical for free-tier hosting). If you see a temporary “Service unavailable” message, wait a moment and refresh or retry. For a step-by-step **demo user flow** (sign up → order → rewards → support), see [Deployment guide → Demo user flow](./docs/DEPLOYMENT_GUIDE.md#demo-user-flow-for-recruiters).
+
+---
+
+[![CI/CD](https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform/actions)
+[![Test Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)](./apps/web/frontend)
+[![Security](https://img.shields.io/badge/security-0%20critical-green)](https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform/security/advisories)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
@@ -172,8 +193,8 @@
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/ocean-sameer/easy11.git
-cd easy11
+git clone https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform.git
+cd Easy11-AI-Commerce-Platform
 ```
 
 2. **Set up environment variables**

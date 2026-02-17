@@ -34,14 +34,16 @@ export const errorHandler = (
   const statusCode = err instanceof AppError ? err.statusCode : 500;
   const message = err.message || 'Internal server error';
 
-  // Send error response
-  res.status(statusCode).json({
-    error: {
-      statusCode,
-      message,
-      timestamp: new Date().toISOString(),
-      path: req.originalUrl
-    }
-  });
+  // Send error response (never expose stack in production)
+  const body: Record<string, unknown> = {
+    statusCode,
+    message,
+    timestamp: new Date().toISOString(),
+    path: req.originalUrl,
+  };
+  if (process.env.NODE_ENV === 'development' && err.stack) {
+    body.stack = err.stack;
+  }
+  res.status(statusCode).json({ error: body });
 };
 

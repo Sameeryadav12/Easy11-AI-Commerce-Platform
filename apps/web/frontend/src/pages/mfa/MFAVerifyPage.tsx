@@ -14,7 +14,7 @@ export default function MFAVerifyPage() {
   const [searchParams] = useSearchParams();
   const { setAuth } = useAuthStore();
 
-  const redirectTo = searchParams.get('redirect') || '/account';
+  const redirectTo = searchParams.get('redirect') || '/';
 
   const handleSuccess = (mfaToken: string) => {
     // In a real app, exchange the MFA token for a full session token

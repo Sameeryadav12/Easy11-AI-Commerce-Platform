@@ -6,6 +6,26 @@ import { AuthResponse } from '../types';
  * Direct function implementations to ensure they're always available
  */
 
+// #region agent log
+fetch('/api/v1/__debug/log', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    sessionId: 'debug-session',
+    runId: 'run1',
+    hypothesisId: 'B',
+    location: 'src/services/auth.ts:module',
+    message: 'auth module loaded',
+    data: {
+      importMetaUrl: typeof import.meta !== 'undefined' ? (import.meta as any).url : 'no-import-meta',
+      typeofApi: typeof api,
+      typeofApiPost: typeof (api as any)?.post,
+    },
+    timestamp: Date.now(),
+  }),
+}).catch(() => {});
+// #endregion
+
 // Login function - Direct implementation
 export async function login(email: string, password: string): Promise<AuthResponse> {
   console.log('[auth.login] Called with:', { email, password: '***' });
@@ -22,18 +42,48 @@ export async function login(email: string, password: string): Promise<AuthRespon
     }
     
     console.log('[auth.login] Making API call to /auth/login');
+    // #region agent log
+    fetch('/api/v1/__debug/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'E',
+        location: 'src/services/auth.ts:login',
+        message: 'calling api.post /auth/login',
+        data: { emailPresent: !!email, passwordLength: typeof password === 'string' ? password.length : -1 },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     const response = await api.post('/auth/login', { email, password });
     
     console.log('[auth.login] API response received:', { 
       status: response.status,
       hasData: !!response.data 
     });
+    // #region agent log
+    fetch('/api/v1/__debug/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'E',
+        location: 'src/services/auth.ts:login',
+        message: 'received api response /auth/login',
+        data: { status: (response as any)?.status, hasData: !!(response as any)?.data },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     
     if (!response || !response.data) {
       console.error('[auth.login] Invalid response:', response);
       throw new Error('Invalid response from server');
     }
-    
+
     return response.data;
   } catch (error: any) {
     console.error('[auth.login] Error:', error);
@@ -52,19 +102,26 @@ export async function login(email: string, password: string): Promise<AuthRespon
 }
 
 // Register function - Direct implementation
-export async function register(email: string, password: string, name: string): Promise<AuthResponse> {
-  console.log('[auth.register] Called with:', { email, name, password: '***' });
-  
+export async function register(
+  email: string,
+  password: string,
+  name: string,
+  termsAcceptedAt?: string
+): Promise<AuthResponse> {
   try {
     if (!api) {
       throw new Error('API client not initialized');
     }
-    
     if (typeof api.post !== 'function') {
       throw new Error('API client post method not available');
     }
-    
-    const response = await api.post('/auth/register', { email, password, name });
+    const body: { email: string; password: string; name: string; termsAcceptedAt?: string } = {
+      email,
+      password,
+      name,
+    };
+    if (termsAcceptedAt) body.termsAcceptedAt = termsAcceptedAt;
+    const response = await api.post('/auth/register', body);
     
     if (!response || !response.data) {
       throw new Error('Invalid response from server');

@@ -4,19 +4,18 @@ import { motion } from 'framer-motion';
 import {
   Package,
   TrendingUp,
+  RotateCcw,
   Gift,
   MessageSquare,
   ArrowRight,
   Clock,
   CheckCircle,
   Sparkles,
-  Bell,
-  MapPin,
-  CreditCard,
   Shield,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { useOrdersStore, generateMockOrders } from '../../store/ordersStore';
+import { useOrdersStore } from '../../store/ordersStore';
 import { useRewardsStore } from '../../store/rewardsStore';
 import { useWishlistStore } from '../../store/wishlistStore';
 import { useNotificationStore } from '../../store/notificationStore';
@@ -29,7 +28,7 @@ import { Button } from '../../components/ui';
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const { orders, setOrders, getRecentOrders, getPendingOrders } = useOrdersStore();
-  const { points, tier, tierProgress, getPointsToNextTier } = useRewardsStore();
+  const { points, tier, tierProgress, getPointsToNextTier, summary } = useRewardsStore();
   const { items: wishlistItems, getPriceDropAlerts } = useWishlistStore();
   const { unreadCount } = useNotificationStore();
   const { addresses } = useAddressStore();
@@ -46,11 +45,7 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     setIsLoading(true);
     try {
-      // Load orders if not already loaded
-      if (orders.length === 0) {
-        setOrders(generateMockOrders());
-      }
-      // In a real app, load other data here
+      // In a real app, load dashboard data from backend here.
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -62,6 +57,15 @@ export default function DashboardPage() {
   const pendingOrders = getPendingOrders();
   const priceDropAlerts = getPriceDropAlerts();
   const pointsToNext = getPointsToNextTier();
+  const mfaEnabled = Boolean(mfaStatus?.enabled);
+
+  const returnEligibleCount = orders.filter((order) => {
+    if (order.status !== 'delivered') return false;
+    const deliveredAt = new Date(order.deliveredDate || order.date).getTime();
+    if (Number.isNaN(deliveredAt)) return false;
+    const days = (Date.now() - deliveredAt) / (1000 * 60 * 60 * 24);
+    return days <= 30;
+  }).length;
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -94,88 +98,139 @@ export default function DashboardPage() {
         </p>
       </motion.div>
 
-      {/* Quick Actions Grid */}
+      {/* Status & Actions (customer-focused) */}
       <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-8"
       >
-        {/* Notifications Quick Action */}
-        <motion.div variants={itemVariants}>
-          <Link to="/account/notifications" className="block">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                  <Bell className="w-6 h-6 text-blue-500" />
-                </div>
-                {unreadCount > 0 && (
-                  <span className="px-3 py-1 bg-red-500 text-white text-xs font-bold rounded-full">
-                    {unreadCount}
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Notifications</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {unreadCount > 0 ? `${unreadCount} New` : 'All Read'}
-              </p>
-            </div>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-heading font-bold text-gray-900 dark:text-white">
+              Status & actions
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              The most important things to do right now.
+            </p>
+          </div>
+          <Link to="/account/support">
+            <Button variant="secondary" size="sm" className="whitespace-nowrap">
+              Support
+            </Button>
           </Link>
-        </motion.div>
+        </div>
 
-        {/* Addresses Quick Action */}
-        <motion.div variants={itemVariants}>
-          <Link to="/account/addresses" className="block">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900/30 rounded-xl flex items-center justify-center mb-4">
-                <MapPin className="w-6 h-6 text-teal-500" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+          {/* Orders status */}
+          <Link
+            to="/account/orders"
+            className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="w-11 h-11 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Addresses</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {addresses.length} Saved
-              </p>
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                Orders
+              </span>
+            </div>
+            <div className="mt-3">
+              {pendingOrders.length > 0 ? (
+                <>
+                  <div className="font-semibold text-gray-900 dark:text-white">
+                    {pendingOrders.length} active
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Latest status: {pendingOrders[0].status.replace('_', ' ')}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="font-semibold text-gray-900 dark:text-white">
+                    No active orders
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" /> Start shopping anytime
+                  </div>
+                </>
+              )}
             </div>
           </Link>
-        </motion.div>
 
-        {/* Payments Quick Action */}
-        <motion.div variants={itemVariants}>
-          <Link to="/account/payments" className="block">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center mb-4">
-                <CreditCard className="w-6 h-6 text-purple-500" />
+          {/* Returns eligibility */}
+          <Link
+            to="/account/returns"
+            className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="w-11 h-11 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center">
+                <RotateCcw className="w-5 h-5 text-orange-600 dark:text-orange-400" />
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Payment Methods</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {paymentMethods.length} Cards
-              </p>
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                Returns
+              </span>
+            </div>
+            <div className="mt-3">
+              <div className="font-semibold text-gray-900 dark:text-white">
+                {returnEligibleCount > 0 ? `${returnEligibleCount} eligible` : 'No eligible returns'}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                30‑day return window
+              </div>
             </div>
           </Link>
-        </motion.div>
 
-        {/* Security Quick Action */}
-        <motion.div variants={itemVariants}>
-          <Link to="/account/security" className="block">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
-                  <Shield className="w-6 h-6 text-green-500" />
-                </div>
-                {mfaStatus && (
-                  <span className={`px-2 py-1 text-xs font-bold rounded-full ${
-                    mfaStatus.is_enabled ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
-                  }`}>
-                    {mfaStatus.is_enabled ? 'ON' : 'OFF'}
-                  </span>
-                )}
+          {/* Security action */}
+          <Link
+            to={mfaEnabled ? '/account/security' : '/auth/mfa/enroll'}
+            className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-gray-100 dark:bg-gray-700">
+                <Shield
+                  className={`w-5 h-5 ${
+                    mfaEnabled ? 'text-green-600 dark:text-green-400' : 'text-yellow-700 dark:text-yellow-300'
+                  }`}
+                />
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Security</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {mfaStatus?.is_enabled ? 'Protected' : 'Basic'}
-              </p>
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                Security
+              </span>
+            </div>
+            <div className="mt-3">
+              <div className="font-semibold text-gray-900 dark:text-white">
+                {mfaEnabled ? 'MFA enabled' : 'Enable MFA'}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                {mfaEnabled ? 'Manage devices & sessions' : 'Recommended for account safety'}
+              </div>
             </div>
           </Link>
-        </motion.div>
+
+          {/* Support shortcut */}
+          <Link
+            to="/account/support"
+            className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="w-11 h-11 bg-teal-100 dark:bg-teal-900/30 rounded-xl flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              </div>
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                Help
+              </span>
+            </div>
+            <div className="mt-3">
+              <div className="font-semibold text-gray-900 dark:text-white">
+                Get support
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Create a ticket in 30 seconds
+              </div>
+            </div>
+          </Link>
+        </div>
       </motion.div>
 
       {/* Main Widgets Grid */}
@@ -255,33 +310,43 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
-        {/* Rewards Widget */}
+        {/* Rewards Summary (kept small & secondary) */}
         <motion.div variants={itemVariants}>
-          <Link to="/account/rewards">
-            <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-md p-6 text-white hover:shadow-lg transition-shadow h-full">
+          <Link to="/account/rewards" className="block">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow h-full">
               <div className="flex items-center justify-between mb-4">
-                <Gift className="w-8 h-8" />
-                <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-semibold">
+                <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                  <Gift className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-full text-xs font-bold">
                   {tier}
                 </span>
               </div>
-              <h3 className="text-2xl font-heading font-bold mb-2">
-                {points.toLocaleString()} Points
-              </h3>
-              <p className="text-purple-100 text-sm mb-4">
-                {pointsToNext > 0
-                  ? `${pointsToNext} points to ${tier === 'Silver' ? 'Gold' : 'Platinum'}`
-                  : 'Max tier reached!'}
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Rewards</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                {points.toLocaleString()} pts
+                {summary.pendingPoints > 0 && (
+                  <span className="ml-1 text-sm font-normal text-gray-500 dark:text-gray-400">
+                    ({summary.pendingPoints.toLocaleString()} pending)
+                  </span>
+                )}
               </p>
-              <div className="w-full bg-white/20 rounded-full h-2 mb-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                {pointsToNext > 0
+                  ? `${pointsToNext} to ${tier === 'Silver' ? 'Gold' : tier === 'Gold' ? 'Platinum' : tier === 'Platinum' ? 'Diamond' : 'next'}`
+                  : 'Max tier reached'}
+              </p>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div
-                  className="bg-white h-2 rounded-full transition-all duration-500"
+                  className="bg-purple-500 h-2 rounded-full transition-all duration-500"
                   style={{ width: `${tierProgress}%` }}
                 />
               </div>
-              <button className="text-white font-semibold text-sm flex items-center hover:underline">
-                Redeem Points <ArrowRight className="w-4 h-4 ml-1" />
-              </button>
+              <div className="mt-4">
+                <Button variant="secondary" size="sm" className="w-full">
+                  View rewards
+                </Button>
+              </div>
             </div>
           </Link>
         </motion.div>

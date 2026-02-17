@@ -51,9 +51,13 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* User Section */}
+        {/* User Section - tap to go to account */}
         {user && (
-          <div className="p-6 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <Link
+            to="/account"
+            onClick={handleLinkClick}
+            className="block p-6 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
                 <User className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -67,7 +71,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
                 </p>
               </div>
             </div>
-          </div>
+          </Link>
         )}
 
         {/* Navigation Links */}
@@ -131,7 +135,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose }) => {
           {user ? (
             <>
               <Link
-                to="/dashboard"
+                to="/account"
                 onClick={handleLinkClick}
                 className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >

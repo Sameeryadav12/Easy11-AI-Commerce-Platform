@@ -1,5 +1,7 @@
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Cookie, Settings, Shield, BarChart, Target, Calendar, Info } from 'lucide-react';
+import { Cookie, Settings, Shield, BarChart, Target, Calendar } from 'lucide-react';
+import { useCookieConsentStore } from '../store/cookieConsentStore';
 
 /**
  * Cookie Policy Page
@@ -10,6 +12,12 @@ import { Cookie, Settings, Shield, BarChart, Target, Calendar, Info } from 'luci
  */
 export default function CookiePolicyPage() {
   const lastUpdated = 'January 15, 2025';
+  const [searchParams] = useSearchParams();
+  const fromParam = searchParams.get('from');
+  const fromSupport = fromParam === 'support' || fromParam === 'account-support';
+  const supportBackUrl = fromParam === 'account-support' ? '/account/support' : '/support';
+
+  const openPreferencesModal = useCookieConsentStore((s) => s.openPreferencesModal);
 
   const cookieTypes = [
     {
@@ -64,6 +72,17 @@ export default function CookiePolicyPage() {
       purpose: 'Deliver personalized ads and measure effectiveness',
       retention: 'Up to 2 years',
     },
+  ];
+
+  const cookieList = [
+    { name: '_ga', purpose: 'Google Analytics - distinguishes users', category: 'Analytics', provider: 'Google', retention: '2 years' },
+    { name: '_gid', purpose: 'Google Analytics - distinguishes users', category: 'Analytics', provider: 'Google', retention: '24 hours' },
+    { name: '_gat', purpose: 'Google Analytics - throttles request rate', category: 'Analytics', provider: 'Google', retention: '1 minute' },
+    { name: '_fbp', purpose: 'Facebook Pixel - tracks conversions', category: 'Marketing', provider: 'Meta', retention: '3 months' },
+    { name: '_fbc', purpose: 'Facebook - attributed click ID', category: 'Marketing', provider: 'Meta', retention: '1 year' },
+    { name: 'session_id', purpose: 'Session management', category: 'Essential', provider: 'Easy11', retention: 'Session' },
+    { name: 'cart_token', purpose: 'Shopping cart persistence', category: 'Essential', provider: 'Easy11', retention: '14 days' },
+    { name: 'theme', purpose: 'Light/dark mode preference', category: 'Functional', provider: 'Easy11', retention: '1 year' },
   ];
 
   const sections = [
@@ -129,6 +148,11 @@ Cookies do not contain personal information that can identify you directly, but 
 - Content delivery networks (faster loading)
 
 These third parties may use cookies to collect information about your online activities across different websites. We do not control these third-party cookies, and this Cookie Policy does not cover them. Please refer to the privacy policies of these third parties for more information.`,
+    },
+    {
+      id: 'cookie-list',
+      title: 'Cookie List',
+      content: null, // Rendered as table below
     },
     {
       id: 'manage-cookies',
@@ -211,8 +235,8 @@ We encourage you to review this Cookie Policy periodically to stay informed abou
       content: `If you have any questions about our use of cookies or this Cookie Policy, please contact us:
 
 **Email:** privacy@easy11.com
-**Phone:** 1-800-EASY-11
-**Address:** 123 Commerce Street, San Francisco, CA 94105, United States
+**Support:** support@easy11.com
+**Address:** Melbourne, Victoria, Australia
 
 For cookie-related inquiries, you can also use our contact form or visit our support center.`,
     },
@@ -220,6 +244,17 @@ For cookie-related inquiries, you can also use our contact form or visit our sup
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Back to Support when opened from Support */}
+      {fromSupport && (
+        <div className="container-custom pt-4 pb-0">
+          <Link
+            to={supportBackUrl}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            ← Back to Support
+          </Link>
+        </div>
+      )}
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-16">
         <div className="container-custom">
@@ -362,6 +397,32 @@ For cookie-related inquiries, you can also use our contact form or visit our sup
                 <Cookie className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                 {section.title}
               </h2>
+              {section.id === 'cookie-list' ? (
+                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-700/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Name</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Purpose</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Category</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Provider</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Retention</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {cookieList.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                          <td className="px-4 py-3 font-mono text-gray-700 dark:text-gray-300">{row.name}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.purpose}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.category}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.provider}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.retention}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
               <div className="prose prose-lg dark:prose-invert max-w-none">
                 {section.content.split('\n\n').map((paragraph, pIndex) => {
                   if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
@@ -399,6 +460,7 @@ For cookie-related inquiries, you can also use our contact form or visit our sup
                   }
                 })}
               </div>
+              )}
             </motion.section>
           ))}
         </div>
@@ -421,16 +483,20 @@ For cookie-related inquiries, you can also use our contact form or visit our sup
                   You can update your cookie preferences at any time through your browser settings or our cookie consent banner.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <button className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                  <button
+                    type="button"
+                    onClick={openPreferencesModal}
+                    className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                  >
                     <Settings className="w-5 h-5 mr-2" />
                     Update Cookie Preferences
                   </button>
-                  <a
-                    href="/account/privacy"
+                  <Link
+                    to="/account/privacy"
                     className="inline-flex items-center justify-center px-6 py-3 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border-2 border-blue-600 dark:border-blue-400 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     Privacy Settings
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>

@@ -19,11 +19,45 @@ export default function Login() {
     setIsLoading(true);
 
     try {
+      // #region agent log
+      fetch('/api/v1/__debug/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'A',
+          location: 'src/pages/Login.tsx:handleSubmit',
+          message: 'about to call authService.login',
+          data: {
+            pathname: typeof window !== 'undefined' ? window.location.pathname : 'no-window',
+            typeofAuthService: typeof authService,
+            typeofAuthServiceLogin: typeof (authService as any)?.login,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       const authResponse = await authService.login(formData.email, formData.password);
       setAuth(authResponse);
       toast.success('Logged in successfully!');
       navigate('/');
     } catch (error: any) {
+      // #region agent log
+      fetch('/api/v1/__debug/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'A',
+          location: 'src/pages/Login.tsx:catch',
+          message: 'login failed',
+          data: { errorMessage: (error as any)?.message, hasResponse: !!(error as any)?.response },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       toast.error(error.response?.data?.error?.message || 'Login failed');
     } finally {
       setIsLoading(false);

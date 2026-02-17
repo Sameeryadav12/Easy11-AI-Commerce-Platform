@@ -29,12 +29,16 @@ export default function ReferralsPage() {
     referralInvites,
     regenerateReferralLink,
     recordReferralShare,
+    recordReferralSignup,
+    recordReferralFirstPurchase,
   } = useRewardsStore((state) => ({
     referralLink: state.referralLink,
     referralStats: state.referralStats,
     referralInvites: state.referralInvites,
     regenerateReferralLink: state.regenerateReferralLink,
     recordReferralShare: state.recordReferralShare,
+    recordReferralSignup: state.recordReferralSignup,
+    recordReferralFirstPurchase: state.recordReferralFirstPurchase,
   }));
 
   const [copied, setCopied] = useState(false);
@@ -228,12 +232,31 @@ export default function ReferralsPage() {
                         : 'Awaiting first action'}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {invite.rewardEarned ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {invite.status === 'rewarded' && invite.rewardEarned != null && (
                       <p className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
-                        Earned ${invite.rewardEarned.toFixed(0)}
+                        +{invite.rewardEarned} pts earned
                       </p>
-                    ) : (
+                    )}
+                    {invite.status === 'pending' && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => recordReferralSignup(invite.id)}
+                      >
+                        Mark as signed up
+                      </Button>
+                    )}
+                    {invite.status === 'joined' && (
+                      <Button
+                        variant="primary"
+                                        size="sm"
+                                        onClick={() => recordReferralFirstPurchase(invite.id)}
+                      >
+                        Mark first purchase
+                      </Button>
+                    )}
+                    {invite.status !== 'rewarded' && invite.status !== 'pending' && invite.status !== 'joined' && (
                       <Button
                         variant="ghost"
                         size="sm"

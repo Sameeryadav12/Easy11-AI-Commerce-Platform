@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
@@ -23,7 +23,28 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Get redirect path from location state (if redirected from protected route)
-  const from = (location.state as any)?.from || '/account';
+  const from = (location.state as any)?.from || '/';
+
+  useEffect(() => {
+    // #region agent log
+    fetch('/api/v1/__debug/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run3',
+        hypothesisId: 'A',
+        location: 'src/pages/auth/LoginPage.tsx:useEffect',
+        message: 'LoginPage mounted',
+        data: {
+          pathname: typeof window !== 'undefined' ? window.location.pathname : 'no-window',
+          typeofLogin: typeof login,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -32,14 +53,13 @@ export default function LoginPage() {
       [name]: type === 'checkbox' ? checked : value,
     }));
     
-    // Clear error for this field
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
+    // Clear error for this field and general error when user edits
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors[name];
+      if (name === 'email' || name === 'password') delete newErrors.general;
+      return newErrors;
+    });
   };
 
   const validate = (): boolean => {
@@ -57,6 +77,26 @@ export default function LoginPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleDemoLogin = () => {
+    const demoUser = {
+      id: 'demo-user-id',
+      email: 'TestDashboard2@gmail.com',
+      name: 'Test Dashboard',
+      role: 'CUSTOMER' as const,
+      createdAt: new Date().toISOString(),
+    };
+    setAuth({
+      user: demoUser,
+      accessToken: 'demo-token',
+      refreshToken: 'demo-refresh',
+    });
+    toast.success(`Signed in as ${demoUser.email} (demo mode)`, {
+      icon: '👋',
+      duration: 3000,
+    });
+    navigate(from, { replace: true });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -65,8 +105,27 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
+    setErrors({});
 
     try {
+      // #region agent log
+      fetch('/api/v1/__debug/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'A',
+          location: 'src/pages/auth/LoginPage.tsx:handleSubmit',
+          message: 'about to validate login import',
+          data: {
+            pathname: typeof window !== 'undefined' ? window.location.pathname : 'no-window',
+            typeofLogin: typeof login,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       // Verify login function exists
       if (typeof login !== 'function') {
         console.error('[LoginPage] login is not a function:', typeof login, login);
@@ -98,34 +157,38 @@ export default function LoginPage() {
       navigate(from, { replace: true });
     } catch (error: any) {
       console.error('Login error:', error);
-      
-      // Handle different error types
+
+      const status = error.response?.status;
+      const apiMessage =
+        error.response?.data?.error?.message || error.response?.data?.message;
       let errorMessage = 'Invalid credentials or verification required';
-      
+
       if (error.response) {
-        // Server responded with error
-        errorMessage = error.response.data?.message || error.response.data?.error?.message || errorMessage;
+        errorMessage =
+          apiMessage ||
+          (status === 401 ? 'Invalid email or password' : undefined) ||
+          (status === 503
+            ? 'Service temporarily unavailable. Use demo login to explore the app.'
+            : undefined) ||
+          (status >= 500
+            ? 'Server is temporarily unavailable. Use demo login to explore the app.'
+            : undefined) ||
+          errorMessage;
       } else if (error.request) {
-        // Request made but no response (network error)
-        errorMessage = 'Unable to connect to server. Please check your connection.';
+        errorMessage =
+          'Unable to connect to server. Use demo login to explore the app.';
+      } else if (error.message?.includes('login is not a function')) {
+        errorMessage = 'Authentication service error. Please try again.';
       } else if (error.message) {
-        // Error in request setup
-        if (error.message.includes('login is not a function')) {
-          errorMessage = 'Authentication service error. Please try again.';
-        } else {
-          errorMessage = error.message;
-        }
+        errorMessage = error.message;
       }
-      
-      toast.error(errorMessage, {
-        duration: 4000,
-      });
-      
-      // Set form errors to show error state
+
       setErrors({
-        email: ' ', // Space to show error state
+        general: errorMessage,
+        email: ' ',
         password: ' ',
       });
+      toast.error(errorMessage, { duration: 5000 });
     } finally {
       setIsSubmitting(false);
     }
@@ -137,6 +200,23 @@ export default function LoginPage() {
       subtitle="Sign in to your account to continue shopping"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
+        {errors.general && (
+          <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
+            {errors.general}
+            {(errors.general?.includes('demo login') ||
+              errors.general?.includes('unavailable')) && (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                className="mt-3 w-full"
+                onClick={handleDemoLogin}
+              >
+                Use demo login
+              </Button>
+            )}
+          </div>
+        )}
         {/* Email Field */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

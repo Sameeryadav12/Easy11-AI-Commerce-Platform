@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
+import { useOrdersStore } from '../store/ordersStore';
 import { motion } from 'framer-motion';
 import { Package, Search, MapPin, Clock, CheckCircle, Truck, AlertCircle, Calendar } from 'lucide-react';
 import { Button, Input } from '../components/ui';
@@ -26,11 +29,13 @@ interface TrackingEvent {
 
 interface OrderTracking {
   orderNumber: string;
+  orderDate: string;
   trackingNumber: string;
   status: 'processing' | 'shipped' | 'in-transit' | 'out-for-delivery' | 'delivered' | 'exception';
   estimatedDelivery: string;
   carrier: string;
   address: string;
+  items: { name: string; quantity: number }[];
   events: TrackingEvent[];
 }
 
@@ -38,11 +43,13 @@ interface OrderTracking {
 const mockTrackingData: Record<string, OrderTracking> = {
   'ORD-12345': {
     orderNumber: 'ORD-12345',
+    orderDate: '2025-01-15T10:00:00',
     trackingNumber: 'TRK-987654321',
     status: 'in-transit',
     estimatedDelivery: '2025-01-20',
     carrier: 'FedEx',
     address: '123 Main St, San Francisco, CA 94105',
+    items: [{ name: 'Wireless Headphones Pro', quantity: 1 }, { name: 'USB-C Cable 6ft', quantity: 2 }],
     events: [
       {
         id: '1',
@@ -97,17 +104,28 @@ const mockTrackingData: Record<string, OrderTracking> = {
 };
 
 export default function TrackOrderPage() {
-  const [trackingInput, setTrackingInput] = useState('');
+  const user = useAuthStore((s) => s.user);
+  const recentOrders = useOrdersStore((s) => s.getRecentOrders(5));
+  const [searchParams] = useSearchParams();
+  const fromParam = searchParams.get('from');
+  const orderParam = searchParams.get('order') || '';
+  const fromSupport = fromParam === 'support' || fromParam === 'account-support';
+  const supportBackUrl = fromParam === 'account-support' ? '/account/support' : '/support';
+  const [trackingInput, setTrackingInput] = useState(orderParam);
   const [trackingData, setTrackingData] = useState<OrderTracking | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [emptyError, setEmptyError] = useState(false);
+  const [searchAttempted, setSearchAttempted] = useState(false);
 
   const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!trackingInput.trim()) {
-      toast.error('Please enter an order number or tracking number');
+      setEmptyError(true);
+      toast.error('Please enter a valid order or tracking number.');
       return;
     }
+    setEmptyError(false);
 
     setIsSearching(true);
 
@@ -121,12 +139,13 @@ export default function TrackOrderPage() {
         order.trackingNumber.toLowerCase() === trackingInput.toLowerCase()
     );
 
+    setSearchAttempted(true);
     if (found) {
       setTrackingData(found);
       toast.success('Order found!');
     } else {
-      toast.error('Order not found. Please check your order number or tracking number.');
       setTrackingData(null);
+      toast.error('Order not found. Please check your order number or tracking number.');
     }
 
     setIsSearching(false);
@@ -171,6 +190,16 @@ export default function TrackOrderPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Breadcrumb */}
+      <div className="container-custom pt-4 pb-0">
+        <nav className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400" aria-label="Breadcrumb">
+          <Link to="/" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Home</Link>
+          <span aria-hidden>/</span>
+          <Link to="/support" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Support</Link>
+          <span aria-hidden>/</span>
+          <span className="font-medium text-gray-900 dark:text-white">Track Order</span>
+        </nav>
+      </div>
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-16">
         <div className="container-custom">
@@ -200,29 +229,55 @@ export default function TrackOrderPage() {
           className="max-w-2xl mx-auto mb-12"
         >
           <form onSubmit={handleTrack} className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+            {user && recentOrders.length > 0 && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recent orders</label>
+                <div className="flex flex-wrap gap-2">
+                  {recentOrders.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => setTrackingInput(o.orderNumber)}
+                      className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                    >
+                      {o.orderNumber}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <Input
                   type="text"
                   placeholder="Enter order number or tracking number"
                   value={trackingInput}
-                  onChange={(e) => setTrackingInput(e.target.value)}
+                  onChange={(e) => {
+                    setTrackingInput(e.target.value);
+                    if (emptyError) setEmptyError(false);
+                  }}
                   leftIcon={<Search className="w-5 h-5" />}
                   className="w-full"
                 />
+                {emptyError && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-2" role="alert">
+                    Please enter a valid order or tracking number.
+                  </p>
+                )}
               </div>
               <Button
                 type="submit"
                 variant="primary"
                 size="lg"
                 isLoading={isSearching}
+                loadingLabel="Tracking..."
                 className="whitespace-nowrap"
               >
-                {isSearching ? 'Tracking...' : 'Track Order'}
+                Track Order
               </Button>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
-              <strong>Demo:</strong> Try tracking order <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">ORD-12345</code>
+              Example order number: <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">ORD-12345</code>
             </p>
           </form>
         </motion.div>
@@ -235,6 +290,29 @@ export default function TrackOrderPage() {
             transition={{ duration: 0.5 }}
             className="max-w-4xl mx-auto space-y-6"
           >
+            {/* Order Status Stepper - Amazon-style visual timeline */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+              <h3 className="text-lg font-heading font-bold text-gray-900 dark:text-white mb-4">Order Status</h3>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 overflow-x-auto pb-2">
+                {['processing', 'shipped', 'in-transit', 'out-for-delivery', 'delivered'].map((s, i) => {
+                  const statusOrder = ['processing', 'shipped', 'in-transit', 'out-for-delivery', 'delivered'];
+                  const idx = statusOrder.indexOf(trackingData.status);
+                  const isCompleted = i < idx;
+                  const isCurrent = i === idx;
+                  const label = s.replace(/-/g, ' ');
+                  return (
+                    <div key={s} className="flex items-center gap-1 sm:gap-2">
+                      <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg whitespace-nowrap ${isCompleted ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : isCurrent ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
+                        {isCompleted ? <CheckCircle className="w-4 h-4" /> : isCurrent ? <Truck className="w-4 h-4" /> : <div className="w-4 h-4 rounded-full border-2 border-current" />}
+                        <span className="capitalize text-sm">{label}</span>
+                      </div>
+                      {i < 4 && <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">→</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Order Summary */}
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -242,6 +320,9 @@ export default function TrackOrderPage() {
                   <h2 className="text-2xl font-heading font-bold text-gray-900 dark:text-white mb-2">
                     Order {trackingData.orderNumber}
                   </h2>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Order date: {trackingData.orderDate ? new Date(trackingData.orderDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                  </p>
                   <p className="text-gray-600 dark:text-gray-400">
                     Tracking: <span className="font-mono">{trackingData.trackingNumber}</span>
                   </p>
@@ -283,10 +364,27 @@ export default function TrackOrderPage() {
                   <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Delivery Address</p>
-                    <p className="font-semibold text-gray-900 dark:text-white text-sm">{trackingData.address}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                      {trackingData.address.replace(/^(\d+)\s+(\w+)/, (_, n, s) => `${n} ${s[0]}***`)}
+                    </p>
                   </div>
                 </div>
               </div>
+
+              {/* Items Ordered */}
+              {trackingData.items && trackingData.items.length > 0 && (
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Items in this order</p>
+                  <ul className="space-y-1">
+                    {trackingData.items.map((item, i) => (
+                      <li key={i} className="text-sm text-gray-600 dark:text-gray-400 flex justify-between">
+                        <span>{item.name}</span>
+                        <span className="font-medium">×{item.quantity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             {/* Tracking Timeline */}
@@ -363,18 +461,18 @@ export default function TrackOrderPage() {
                     If your order is delayed or you have questions about delivery, please contact our support team.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3">
-                    <a
-                      href="/contact"
+                    <Link
+                      to="/contact?from=track-order"
                       className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
                     >
                       Contact Support
-                    </a>
-                    <a
-                      href="/faq"
+                    </Link>
+                    <Link
+                      to="/faq?from=track-order"
                       className="inline-flex items-center justify-center px-4 py-2 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border-2 border-blue-600 dark:border-blue-400 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >
                       View FAQ
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -382,8 +480,30 @@ export default function TrackOrderPage() {
           </motion.div>
         )}
 
-        {/* No Results State */}
-        {!trackingData && !isSearching && (
+        {/* Error State - Order not found */}
+        {searchAttempted && !trackingData && !isSearching && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-2xl mx-auto mb-8"
+          >
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center">
+              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+              <h3 className="text-lg font-heading font-bold text-red-800 dark:text-red-300 mb-2">
+                Order not found
+              </h3>
+              <p className="text-red-700 dark:text-red-400 text-sm mb-4">
+                We couldn't find an order matching "{trackingInput}". Please check the order number or tracking number and try again.
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Make sure you're using the format shown in your confirmation email (e.g. ORD-12345).
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* No Results State - Initial view (no search yet) */}
+        {!trackingData && !isSearching && !searchAttempted && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

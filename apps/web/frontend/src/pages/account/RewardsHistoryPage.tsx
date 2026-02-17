@@ -1,23 +1,39 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Filter, DownloadCloud, Calendar } from 'lucide-react';
 import { Button, Card, CardBody, CardHeader } from '../../components/ui';
 import { useRewardsStore } from '../../store/rewardsStore';
+import { useOrdersStore } from '../../store/ordersStore';
 import type { RewardTransaction, RewardTransactionType } from '../../types/rewards';
 
 const typeLabels: Record<RewardTransactionType, string> = {
   earned: 'Earned',
   redeemed: 'Redeemed',
+  reversed: 'Reversed',
   expired: 'Expired',
 };
 
+function getTransactionLabel(txn: RewardTransaction): string {
+  if (txn.type === 'earned' && txn.status === 'pending') return 'Earned (pending)';
+  if (txn.type === 'earned' && txn.status === 'available') return 'Earned (available)';
+  return typeLabels[txn.type];
+}
+
 export default function RewardsHistoryPage() {
-  const { transactions, summary } = useRewardsStore((state) => ({
+  const { transactions, summary, ledger, syncFromOrders } = useRewardsStore((state) => ({
     transactions: state.transactions,
     summary: state.summary,
+    ledger: state.ledger,
+    syncFromOrders: state.syncFromOrders,
   }));
+  const orders = useOrdersStore((state) => state.orders);
 
-  const [typeFilter, setTypeFilter] = useState<'all' | RewardTransactionType>('all');
+  // Account-based: backfill ledger from orders when empty so history shows after login.
+  useEffect(() => {
+    if (ledger.length === 0 && orders.length > 0) syncFromOrders(orders);
+  }, [ledger.length, orders, syncFromOrders]);
+
+  const [typeFilter, setTypeFilter] = useState<'all' | RewardTransactionType | 'earned_pending' | 'earned_available'>('all');
   const [rangeFilter, setRangeFilter] = useState<'30' | '90' | '365'>('30');
 
   const filteredTransactions = useMemo(() => {
@@ -27,7 +43,9 @@ export default function RewardsHistoryPage() {
     return transactions.filter((txn) => {
       const date = new Date(txn.date);
       if (date < cutoff) return false;
-      if (typeFilter !== 'all' && txn.type !== typeFilter) return false;
+      if (typeFilter === 'earned_pending' && (txn.type !== 'earned' || txn.status !== 'pending')) return false;
+      if (typeFilter === 'earned_available' && (txn.type !== 'earned' || txn.status !== 'available')) return false;
+      if (typeFilter !== 'all' && typeFilter !== 'earned_pending' && typeFilter !== 'earned_available' && txn.type !== typeFilter) return false;
       return true;
     });
   }, [transactions, typeFilter, rangeFilter]);
@@ -38,9 +56,9 @@ export default function RewardsHistoryPage() {
       .map((txn) =>
         [
           new Date(txn.date).toISOString(),
-          txn.type,
+          getTransactionLabel(txn),
           txn.points,
-          `"${txn.description.replace(/"/g, '""')}"`,
+          `"${(txn.description ?? '').replace(/"/g, '""')}"`,
           txn.orderId ?? '',
         ].join(',')
       )
@@ -90,7 +108,7 @@ export default function RewardsHistoryPage() {
             <LedgerSummary
               label="Pending points"
               value={summary.pendingPoints.toLocaleString()}
-              detail="Unlocks after return window"
+              detail="Unlocks after delivery (prevents abuse from returns/cancels)"
             />
             <LedgerSummary
               label="Expiring soon"
@@ -108,14 +126,14 @@ export default function RewardsHistoryPage() {
             <span className="text-sm font-medium">Filter ledger</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {(['all', 'earned', 'redeemed', 'expired'] as const).map((type) => (
+            {(['all', 'earned_pending', 'earned_available', 'earned', 'redeemed', 'reversed', 'expired'] as const).map((type) => (
               <Button
                 key={type}
                 variant={typeFilter === type ? 'primary' : 'secondary'}
                 size="sm"
                 onClick={() => setTypeFilter(type)}
               >
-                {type === 'all' ? 'All activity' : typeLabels[type]}
+                {type === 'all' ? 'All activity' : type === 'earned_pending' ? 'Earned (pending)' : type === 'earned_available' ? 'Earned (available)' : typeLabels[type as RewardTransactionType]}
               </Button>
             ))}
             <div className="ml-2 flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300">
@@ -145,7 +163,7 @@ export default function RewardsHistoryPage() {
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">{txn.description}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {new Date(txn.date).toLocaleString()} ·{' '}
-                  {typeLabels[txn.type]}
+                  {getTransactionLabel(txn)}
                   {txn.orderId ? ` · Order #${txn.orderId}` : ''}
                 </p>
               </div>

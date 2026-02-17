@@ -25,38 +25,38 @@ export const WhyChooseUs: React.FC = () => {
   const benefits: Benefit[] = [
     {
       icon: <Sparkles className="w-10 h-10" />,
-      title: 'AI-Powered Recommendations',
-      description: 'Our smart AI learns your preferences and suggests products you\'ll genuinely love. Personalized shopping at its best.',
+      title: 'Recommendations for you',
+      description: 'Picks based on your activity and tastes. Updated as you browse.',
       color: 'blue',
     },
     {
       icon: <Shield className="w-10 h-10" />,
-      title: '100% Secure Payments',
-      description: 'Shop with confidence using our encrypted payment system. Your data is protected with bank-level security.',
+      title: 'Secure payments',
+      description: 'Encrypted checkout. Your data is protected.',
       color: 'teal',
     },
     {
       icon: <Zap className="w-10 h-10" />,
-      title: 'Lightning Fast Delivery',
-      description: 'Get your orders delivered quickly with real-time tracking. Same-day delivery available in select areas.',
+      title: 'Fast delivery',
+      description: 'Tracked shipping. Same-day options in select areas.',
       color: 'sky',
     },
     {
       icon: <RefreshCw className="w-10 h-10" />,
-      title: '30-Day Free Returns',
-      description: 'Not satisfied? Return any item within 30 days, no questions asked. Your satisfaction is guaranteed.',
+      title: '30-day returns',
+      description: 'Return any item within 30 days, no questions asked.',
       color: 'purple',
     },
     {
       icon: <HeartHandshake className="w-10 h-10" />,
-      title: '24/7 Customer Support',
-      description: 'Our dedicated support team is always here to help. Chat, email, or call us anytime.',
+      title: 'Support when you need it',
+      description: 'Chat, email, or call. We’re here to help.',
       color: 'rose',
     },
     {
       icon: <Award className="w-10 h-10" />,
-      title: 'Quality Guaranteed',
-      description: 'Every product is carefully vetted for quality. We stand behind everything we sell.',
+      title: 'Quality we stand behind',
+      description: 'Every product is vetted. We back what we sell.',
       color: 'amber',
     },
   ];
@@ -102,7 +102,7 @@ export const WhyChooseUs: React.FC = () => {
             Why Shop with Easy11?
           </h2>
           <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-            We're not just another e-commerce store. Experience the difference with AI-powered shopping.
+            Reliable service, clear policies, and picks that fit you.
           </p>
         </motion.div>
 

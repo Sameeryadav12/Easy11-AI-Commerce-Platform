@@ -9,6 +9,22 @@ export default function ScrollToTop() {
   const { pathname } = useLocation();
 
   useEffect(() => {
+    // #region agent log
+    fetch('/api/v1/__debug/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run5',
+        hypothesisId: 'C',
+        location: 'src/components/navigation/ScrollToTop.tsx:useEffect',
+        message: 'route change',
+        data: { pathname },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     // Disable browser's automatic scroll restoration
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';

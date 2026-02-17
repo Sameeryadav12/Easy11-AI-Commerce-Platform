@@ -173,16 +173,13 @@ export default function ChatWidget() {
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={openChat}
-            className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full shadow-2xl flex items-center justify-center text-white hover:shadow-purple-500/50 transition-shadow group"
-            aria-label="Open AI Assistant"
+            className="fixed bottom-6 right-6 z-50 w-12 h-12 bg-gray-700 dark:bg-gray-600 hover:bg-gray-600 dark:hover:bg-gray-500 rounded-full shadow-lg flex items-center justify-center text-white transition-colors"
+            aria-label="Chat"
           >
-            <Sparkles className="w-7 h-7 group-hover:rotate-12 transition-transform" />
-            <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold animate-pulse">
-              AI
-            </span>
+            <MessageCircle className="w-6 h-6" />
           </motion.button>
         )}
       </AnimatePresence>
@@ -204,7 +201,7 @@ export default function ChatWidget() {
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-white font-heading font-bold">EasyAI Assistant</h3>
+                  <h3 className="text-white font-heading font-bold">Help</h3>
                   <p className="text-purple-100 text-xs">
                     {isTyping ? 'Typing...' : 'Online'}
                   </p>
@@ -344,9 +341,9 @@ export default function ChatWidget() {
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
                 {isVoiceSupported ? (
-                  <>AI-powered by Easy11 • Press Enter to send • 🎤 Click mic for voice</>
+                  <>Press Enter to send • 🎤 Mic for voice</>
                 ) : (
-                  <>AI-powered by Easy11 • Press Enter to send</>
+                  <>Press Enter to send</>
                 )}
               </p>
             </div>

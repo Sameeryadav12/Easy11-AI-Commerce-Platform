@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { userScopedStorage } from './userScopedStorage';
 
 export interface RecentlyViewedProduct {
   id: string;
@@ -50,6 +51,8 @@ export const useRecentlyViewedStore = create<RecentlyViewedState>()(
     }),
     {
       name: 'easy11-recently-viewed',
+      storage: createJSONStorage(() => userScopedStorage),
+      skipHydration: true,
     }
   )
 );

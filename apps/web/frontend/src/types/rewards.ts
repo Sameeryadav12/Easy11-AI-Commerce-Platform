@@ -1,14 +1,34 @@
-export type RewardTier = 'Silver' | 'Gold' | 'Platinum';
+/** Tier from 12-month rolling points. Silver (default) → Gold → Platinum → Diamond. */
+export type RewardTier = 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
 
-export type RewardTransactionType = 'earned' | 'redeemed' | 'expired';
+export type RewardTransactionType = 'earned' | 'redeemed' | 'reversed' | 'expired';
+
+/** Ledger event status for earned points: pending until order delivered/return window passes */
+export type LedgerEarnedStatus = 'pending' | 'available';
+
+export interface LedgerEvent {
+  id: string;
+  date: string;
+  type: 'earned' | 'redeemed' | 'reversed' | 'expired';
+  /** For type 'earned' only: pending → available when order is delivered */
+  status?: LedgerEarnedStatus;
+  points: number;
+  description: string;
+  orderId?: string;
+  /** For reversed: 'cancelled' | 'returned' */
+  reason?: string;
+}
 
 export interface RewardTransaction {
   id: string;
   date: string;
   type: RewardTransactionType;
+  /** For display: earned (pending) vs earned (available) */
+  status?: LedgerEarnedStatus;
   points: number;
   description: string;
   orderId?: string;
+  reason?: string;
 }
 
 export type ReferralStatus = 'pending' | 'joined' | 'purchased' | 'rewarded';

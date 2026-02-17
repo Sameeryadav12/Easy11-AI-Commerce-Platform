@@ -1,9 +1,23 @@
-import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ScrollToTop from './components/navigation/ScrollToTop';
 import { startHeartbeat, startMetricProbes } from './lib/opsEvents';
 import React from 'react';
+import { useAuthStore } from './store/authStore';
+import { setCurrentUserScope } from './store/userScopedStorage';
+import { useCartStore } from './store/cartStore';
+import { useWishlistStore } from './store/wishlistStore';
+import { useRewardsStore } from './store/rewardsStore';
+import { useAddressStore } from './store/addressStore';
+import { usePaymentStore } from './store/paymentStore';
+import { useRecentlyViewedStore } from './store/recentlyViewedStore';
+import { useMFAStore } from './store/mfaStore';
+import { useNotificationStore } from './store/notificationStore';
+import { useOrdersStore } from './store/ordersStore';
+import { useReturnsStore } from './store/returnsStore';
+import { useSupportTicketsStore } from './store/supportTicketsStore';
+import { useCustomerSettingsStore } from './store/settingsStore';
 import Layout from './components/Layout';
 import VendorLayout from './components/vendor/VendorLayout';
 
@@ -19,6 +33,7 @@ import FAQPage from './pages/FAQPage';
 import ShippingPage from './pages/ShippingPage';
 import TrackOrderPage from './pages/TrackOrderPage';
 import SupportPage from './pages/SupportPage';
+import SupportCategoryPage from './pages/SupportCategoryPage';
 import AboutPage from './pages/AboutPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsPage from './pages/TermsPage';
@@ -45,17 +60,25 @@ import RecoveryCodesPage from './pages/mfa/RecoveryCodesPage';
 import AccountLayout from './components/account/AccountLayout';
 import DashboardPage from './pages/account/DashboardPage';
 import OrdersPage from './pages/account/OrdersPage';
+import OrderDetailsPage from './pages/account/OrderDetailsPage';
 import WishlistPage from './pages/account/WishlistPage';
 import RewardsPage from './pages/account/RewardsPage';
 import ReferralsPage from './pages/account/ReferralsPage';
 import RewardsChallengesPage from './pages/account/RewardsChallengesPage';
 import RewardsHistoryPage from './pages/account/RewardsHistoryPage';
+import RedemptionsPage from './pages/account/RedemptionsPage';
+import RewardsHubLayout from './pages/account/RewardsHubLayout';
 import ContributionsPage from './pages/account/ContributionsPage';
 import SecurityPage from './pages/account/SecurityPage';
 import AddressesPage from './pages/account/AddressesPage';
 import PaymentsPage from './pages/account/PaymentsPage';
 import NotificationsPage from './pages/account/NotificationsPage';
 import PrivacyPage from './pages/account/PrivacyPage';
+import SettingsPage from './pages/account/SettingsPage';
+import SupportCenterPage from './pages/account/SupportCenterPage';
+import SupportTicketsPage from './pages/account/SupportTicketsPage';
+import ReturnsRefundsPage from './pages/account/ReturnsRefundsPage';
+import ProfileSecurityPage from './pages/account/ProfileSecurityPage';
 
 // Vendor Pages (Sprint 7)
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -99,10 +122,114 @@ function VendorShell() {
 }
 
 function App() {
+  const userId = useAuthStore((s) => s.user?.id || null);
+
   React.useEffect(() => {
+    // Account-based persistence (Amazon/eBay model):
+    // Set scope FIRST so rehydrate reads from the correct user's storage key.
+    setCurrentUserScope(userId);
+
+    // Rehydrate all user-scoped stores (they use skipHydration - we control when they load).
+    // Logout = scope 'anon' → empty data. Login = scope userId → that user's saved data.
+    const rehydrate = (store: any) => store?.persist?.rehydrate?.();
+    try {
+      rehydrate(useCartStore);
+      rehydrate(useWishlistStore);
+      rehydrate(useRewardsStore);
+      rehydrate(useAddressStore);
+      rehydrate(usePaymentStore);
+      rehydrate(useRecentlyViewedStore);
+      rehydrate(useReturnsStore);
+      rehydrate(useMFAStore);
+      rehydrate(useNotificationStore);
+      rehydrate(useSupportTicketsStore);
+      rehydrate(useCustomerSettingsStore);
+      // Defer so rewards rehydration completes first; then load orders and sync ledger (account-based).
+      setTimeout(() => {
+        useOrdersStore.getState().loadOrdersForUser(userId);
+      }, 0);
+    } catch (e) {
+      console.warn('[App] Rehydrate error:', e);
+    }
+
+    // Close cart drawer on user switch (UI-only)
+    try {
+      useCartStore.setState({ isDrawerOpen: false } as any);
+    } catch {}
+  }, [userId]);
+
+  React.useEffect(() => {
+    // #region agent log
+    fetch('/api/v1/__debug/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run2',
+        hypothesisId: 'C',
+        location: 'src/App.tsx:useEffect',
+        message: 'App mounted',
+        data: {
+          href: typeof window !== 'undefined' ? window.location.href : 'no-window',
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
+    // #region agent log
+    const onError = (event: ErrorEvent) => {
+      fetch('/api/v1/__debug/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run4',
+          hypothesisId: 'D',
+          location: 'src/App.tsx:onError',
+          message: 'window.error',
+          data: {
+            message: event.message,
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason: any = event.reason;
+      fetch('/api/v1/__debug/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run4',
+          hypothesisId: 'D',
+          location: 'src/App.tsx:onUnhandledRejection',
+          message: 'window.unhandledrejection',
+          data: {
+            reasonMessage: reason?.message ?? String(reason),
+            reasonName: reason?.name,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    };
+
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+    // #endregion
+
     const stopHeartbeat = startHeartbeat('customer.web');
     const stopMetrics = startMetricProbes('customer.web');
     return () => {
+      // #region agent log
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+      // #endregion
       stopHeartbeat();
       stopMetrics();
     };
@@ -126,6 +253,7 @@ function App() {
             <Route path="shipping" element={<ShippingPage />} />
             <Route path="track-order" element={<TrackOrderPage />} />
             <Route path="support" element={<SupportPage />} />
+            <Route path="support/category/:slug" element={<SupportCategoryPage />} />
             <Route path="about" element={<AboutPage />} />
             <Route path="privacy" element={<PrivacyPolicyPage />} />
             <Route path="terms" element={<TermsPage />} />
@@ -148,21 +276,27 @@ function App() {
           <Route path="/account" element={<AccountShell />}>
             <Route index element={<DashboardPage />} />
             <Route path="orders" element={<OrdersPage />} />
+            <Route path="orders/:orderId" element={<OrderDetailsPage />} />
             <Route path="wishlist" element={<WishlistPage />} />
-            <Route path="rewards" element={<RewardsPage />} />
-            <Route path="referrals" element={<ReferralsPage />} />
-            <Route path="rewards/challenges" element={<RewardsChallengesPage />} />
-            <Route path="rewards/history" element={<RewardsHistoryPage />} />
+            <Route path="rewards" element={<RewardsHubLayout />}>
+              <Route index element={<RewardsPage />} />
+              <Route path="history" element={<RewardsHistoryPage />} />
+              <Route path="redemptions" element={<RedemptionsPage />} />
+              <Route path="challenges" element={<RewardsChallengesPage />} />
+              <Route path="referrals" element={<ReferralsPage />} />
+            </Route>
+            <Route path="referrals" element={<Navigate to="/account/rewards/referrals" replace />} />
             <Route path="contributions" element={<ContributionsPage />} />
             <Route path="security" element={<SecurityPage />} />
             <Route path="addresses" element={<AddressesPage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
-            <Route path="profile" element={<DashboardPage />} />
-            <Route path="returns" element={<DashboardPage />} />
-            <Route path="settings" element={<DashboardPage />} />
-            <Route path="support" element={<DashboardPage />} />
+            <Route path="profile" element={<ProfileSecurityPage />} />
+            <Route path="returns" element={<ReturnsRefundsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="support" element={<SupportCenterPage />} />
+            <Route path="support/tickets" element={<SupportTicketsPage />} />
           </Route>
 
           <Route path="/vendor/register" element={<VendorRegisterPage />} />

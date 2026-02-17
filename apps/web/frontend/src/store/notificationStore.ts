@@ -1,9 +1,12 @@
 /**
  * Notifications Store
  * Sprint 3: Customer Dashboard - Notification Management
+ * Account-based persistence: notifications and preferences survive logout (Amazon/eBay model).
  */
 
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { userScopedStorage } from './userScopedStorage';
 import type { Notification, NotificationPreference } from '../types/dashboard';
 
 interface NotificationState {
@@ -26,7 +29,9 @@ interface NotificationState {
   reset: () => void;
 }
 
-export const useNotificationStore = create<NotificationState>()((set, get) => ({
+export const useNotificationStore = create<NotificationState>()(
+  persist(
+    (set, get) => ({
   notifications: [],
   unreadCount: 0,
   preferences: [],
@@ -34,8 +39,9 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
   error: null,
 
   setNotifications: (notifications) => {
-    const unread = notifications.filter((n) => !n.read_at).length;
-    set({ notifications, unreadCount: unread });
+    const list = Array.isArray(notifications) ? notifications : [];
+    const unread = list.filter((n) => n && !n.read_at).length;
+    set({ notifications: list, unreadCount: unread });
   },
 
   addNotification: (notification) =>
@@ -76,7 +82,7 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
 
   updatePreference: (type, channels) =>
     set((state) => ({
-      preferences: state.preferences.map((pref) =>
+      preferences: (state.preferences || []).map((pref) =>
         pref.type === type ? { ...pref, channels } : pref
       ),
     })),
@@ -92,5 +98,17 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
       isLoading: false,
       error: null,
     }),
-}));
+    }),
+    {
+      name: 'easy11-notifications',
+      storage: createJSONStorage(() => userScopedStorage),
+      skipHydration: true,
+      partialize: (state) => ({
+        notifications: Array.isArray(state?.notifications) ? state.notifications : [],
+        unreadCount: typeof state?.unreadCount === 'number' ? state.unreadCount : 0,
+        preferences: Array.isArray(state?.preferences) ? state.preferences : [],
+      }),
+    }
+  )
+);
 

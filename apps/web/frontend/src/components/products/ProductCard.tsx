@@ -16,6 +16,8 @@ export interface Product {
   category: string;
   stock: number;
   badge?: string;
+  brand?: string;
+  deliveryDays?: number;
   isAiRecommended?: boolean;
   isTrending?: boolean;
   isNew?: boolean;

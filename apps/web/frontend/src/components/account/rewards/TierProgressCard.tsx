@@ -5,6 +5,8 @@ import type { RewardTier } from '../../../types/rewards';
 interface TierProgressCardProps {
   tier: RewardTier;
   points: number;
+  /** Pending points (unlock after delivery). Shown so users see total activity when available is 0. */
+  pendingPoints?: number;
   pointsToNext: number;
   tierProgress: number;
   streakMultiplier: number;
@@ -19,30 +21,36 @@ const tierVisuals: Record<
   Silver: {
     gradient: 'from-gray-300 via-gray-400 to-gray-600',
     icon: '🥈',
-    accentText: 'Keep the momentum going!',
+    accentText: '1× points. Reach Gold at 2,500 pts for 1.05×.',
   },
   Gold: {
     gradient: 'from-amber-300 via-amber-400 to-yellow-500',
     icon: '🥇',
-    accentText: 'Premium perks unlocked.',
+    accentText: '1.05× points. Reach Platinum at 10,000 pts for 1.1×.',
   },
   Platinum: {
-    gradient: 'from-indigo-400 via-purple-500 to-slate-800',
+    gradient: 'from-indigo-400 via-purple-500 to-slate-700',
     icon: '💎',
-    accentText: 'You reached the summit.',
+    accentText: '1.1× points. Reach Diamond at 25,000 pts for 1.25×.',
+  },
+  Diamond: {
+    gradient: 'from-cyan-400 via-blue-500 to-indigo-800',
+    icon: '💠',
+    accentText: '1.25× points and top perks.',
   },
 };
 
 export function TierProgressCard({
   tier,
   points,
+  pendingPoints = 0,
   pointsToNext,
   tierProgress,
   streakMultiplier,
   aiTip,
   onRedeem,
 }: TierProgressCardProps) {
-  const visuals = tierVisuals[tier];
+  const visuals = tierVisuals[tier] ?? tierVisuals.Silver;
 
   return (
     <motion.div
@@ -71,6 +79,11 @@ export function TierProgressCard({
           <p className="text-5xl font-heading font-bold leading-tight">
             {points.toLocaleString()}
           </p>
+          {pendingPoints > 0 && (
+            <p className="mt-1 text-sm text-white/90">
+              +{pendingPoints.toLocaleString()} pending (unlock after delivery)
+            </p>
+          )}
           <p className="mt-1 text-sm text-white/80">
             ${ (points / 100).toFixed(2) } value · {visuals.accentText}
           </p>

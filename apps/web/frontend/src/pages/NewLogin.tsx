@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { Button, Card, CardBody, Input } from '../components/ui';
 import { useAuthStore } from '../store/authStore';
+import { login as loginApi } from '../services/auth';
 
 export const NewLogin = () => {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const setAuth = useAuthStore((state) => state.setAuth);
   
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -16,17 +17,146 @@ export const NewLogin = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    // #region agent log
+    fetch('/api/v1/__debug/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run3',
+        hypothesisId: 'A',
+        location: 'src/pages/NewLogin.tsx:useEffect',
+        message: 'NewLogin mounted',
+        data: {
+          pathname: typeof window !== 'undefined' ? window.location.pathname : 'no-window',
+          typeofLoginApi: typeof loginApi,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
     try {
-      // TODO: Connect to backend API
-      await login(formData.email, formData.password);
-      navigate('/dashboard');
+      // #region agent log
+      (() => {
+        const payload = {
+          sessionId: 'debug-session',
+          runId: 'run7',
+          hypothesisId: 'A',
+          location: 'src/pages/NewLogin.tsx:handleSubmit',
+          message: 'submit clicked',
+          data: {
+            pathname: typeof window !== 'undefined' ? window.location.pathname : 'no-window',
+            typeofLoginApi: typeof loginApi,
+            emailPresent: !!formData.email,
+            passwordLength: typeof formData.password === 'string' ? formData.password.length : -1,
+          },
+          timestamp: Date.now(),
+        };
+        try {
+          if (navigator && typeof navigator.sendBeacon === 'function') {
+            navigator.sendBeacon('/api/v1/__debug/log', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+            return;
+          }
+        } catch {}
+        fetch('/api/v1/__debug/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
+      })();
+      // #endregion
+
+      if (typeof loginApi !== 'function') {
+        throw new Error('Login service not available. Please refresh the page.');
+      }
+
+      const response = await loginApi(formData.email, formData.password);
+      // #region agent log
+      (() => {
+        const payload = {
+          sessionId: 'debug-session',
+          runId: 'run7',
+          hypothesisId: 'E',
+          location: 'src/pages/NewLogin.tsx:afterLogin',
+          message: 'loginApi resolved',
+          data: {
+            hasResponse: !!response,
+            hasUser: !!(response as any)?.user,
+            hasAccessToken: !!(response as any)?.accessToken,
+          },
+          timestamp: Date.now(),
+        };
+        try {
+          if (navigator && typeof navigator.sendBeacon === 'function') {
+            navigator.sendBeacon('/api/v1/__debug/log', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+            return;
+          }
+        } catch {}
+        fetch('/api/v1/__debug/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
+      })();
+      // #endregion
+
+      if (!response || !response.user || !response.accessToken) {
+        throw new Error('Invalid response from server');
+      }
+
+      setAuth(response);
+      navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Invalid email or password');
+      // #region agent log
+      (() => {
+        const payload = {
+          sessionId: 'debug-session',
+          runId: 'run7',
+          hypothesisId: 'A',
+          location: 'src/pages/NewLogin.tsx:catch',
+          message: 'login failed',
+          data: { errorMessage: (err as any)?.message },
+          timestamp: Date.now(),
+        };
+        try {
+          if (navigator && typeof navigator.sendBeacon === 'function') {
+            navigator.sendBeacon('/api/v1/__debug/log', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+            return;
+          }
+        } catch {}
+        fetch('/api/v1/__debug/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
+      })();
+      // #endregion
+      const status = (err as any)?.response?.status;
+      const apiMessage =
+        (err as any)?.response?.data?.error?.message ||
+        (err as any)?.response?.data?.message;
+
+      const friendlyMessage =
+        apiMessage ||
+        (status === 401 ? 'Invalid email or password' : undefined) ||
+        (status === 429 ? 'Too many attempts. Please wait and try again.' : undefined) ||
+        (status === 503 || status >= 500
+          ? 'Server is temporarily unavailable. Use demo login to explore the app.'
+          : undefined) ||
+        (err.message && !err.message.includes('status code')
+          ? err.message
+          : undefined) ||
+        'Login failed';
+
+      setError(friendlyMessage);
     } finally {
       setIsLoading(false);
     }
@@ -38,6 +168,26 @@ export const NewLogin = () => {
       [e.target.name]: e.target.value,
     });
   };
+
+  const handleDemoLogin = () => {
+    const demoUser = {
+      id: 'demo-user-id',
+      email: 'TestDashboard2@gmail.com',
+      name: 'Test Dashboard',
+      role: 'CUSTOMER' as const,
+      createdAt: new Date().toISOString(),
+    };
+    setAuth({
+      user: demoUser,
+      accessToken: 'demo-token',
+      refreshToken: 'demo-refresh',
+    });
+    navigate('/');
+  };
+
+  const showDemoOption =
+    error &&
+    (error.includes('demo login') || error.includes('unavailable'));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 py-16">
@@ -113,6 +263,17 @@ export const NewLogin = () => {
                 {error && (
                   <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                     <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                    {showDemoOption && (
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        className="mt-3 w-full"
+                        onClick={handleDemoLogin}
+                      >
+                        Use demo login
+                      </Button>
+                    )}
                   </div>
                 )}
 

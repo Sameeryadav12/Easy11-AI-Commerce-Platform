@@ -3,21 +3,53 @@
  * Sprint 3: Payment methods management with Step-Up
  */
 
+// Leaf page: Payment methods (accessed via Profile & Security shortcuts)
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CreditCard, Plus, Trash2, CheckCircle, Shield } from 'lucide-react';
+import { CreditCard, Plus, Trash2, CheckCircle, Shield, Lock } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { usePaymentStore } from '../../store/paymentStore';
 import dashboardAPI from '../../services/dashboardAPI';
 import StepUpModal from '../../components/mfa/StepUpModal';
 import { Button } from '../../components/ui';
+import BreadcrumbBack from '../../components/navigation/BreadcrumbBack';
 import toast from 'react-hot-toast';
+import {
+  validateCardNumber,
+  validateCardholderName,
+  validateExpiry,
+  validateCVV,
+  detectCardBrand,
+  cvvLengthForBrand,
+} from '../../utils/cardValidation';
 
 export default function PaymentsPage() {
+  const [searchParams] = useSearchParams();
+  const fromParam = searchParams.get('from');
+  const fromSupport = fromParam === 'support' || fromParam === 'account-support';
+  const parentLabel = fromSupport ? 'Support' : 'Profile';
+  const parentUrl = fromSupport ? (fromParam === 'account-support' ? '/account/support' : '/support') : '/account/profile';
   const { methods, setMethods, deleteMethod: deleteFromStore } = usePaymentStore();
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStepUp, setShowStepUp] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  // Add Card form state
+  const [addCardForm, setAddCardForm] = useState({
+    cardNumber: '',
+    cardName: '',
+    expiryDate: '',
+    cvv: '',
+    nickname: '',
+    setAsDefault: false,
+  });
+  const [addCardErrors, setAddCardErrors] = useState<{
+    cardNumber?: string;
+    cardName?: string;
+    expiryDate?: string;
+    cvv?: string;
+  }>({});
 
   useEffect(() => {
     loadPaymentMethods();
@@ -55,6 +87,48 @@ export default function PaymentsPage() {
     }
   };
 
+  const resetAddCardModal = () => {
+    setShowAddModal(false);
+    setAddCardForm({ cardNumber: '', cardName: '', expiryDate: '', cvv: '', nickname: '', setAsDefault: false });
+    setAddCardErrors({});
+  };
+
+  const handleAddCardSubmit = async () => {
+    const vCard = validateCardNumber(addCardForm.cardNumber);
+    const vName = validateCardholderName(addCardForm.cardName);
+    const vExp = validateExpiry(addCardForm.expiryDate);
+    const brand = detectCardBrand(addCardForm.cardNumber.replace(/\s/g, ''));
+    const vCvv = validateCVV(addCardForm.cvv, brand);
+
+    const errors = {
+      cardNumber: vCard.error,
+      cardName: vName.error,
+      expiryDate: vExp.error,
+      cvv: vCvv.error,
+    };
+    setAddCardErrors(errors);
+    if (vCard.error || vName.error || vExp.error || vCvv.error) return;
+
+    const last4 = addCardForm.cardNumber.replace(/\s/g, '').slice(-4);
+    const expiry = addCardForm.expiryDate.length === 5
+      ? `${addCardForm.expiryDate.slice(0, 2)}/20${addCardForm.expiryDate.slice(3)}`
+      : addCardForm.expiryDate;
+
+    try {
+      const newMethod = await dashboardAPI.addPaymentMethod(
+        `tok_${brand}_${Date.now()}`,
+        addCardForm.nickname || undefined,
+        addCardForm.setAsDefault,
+        { last4, brand: brand === 'other' ? 'visa' : brand, expiry }
+      );
+      usePaymentStore.getState().addMethod(newMethod);
+      toast.success('Card added successfully');
+      resetAddCardModal();
+    } catch (error) {
+      toast.error('Failed to add payment method');
+    }
+  };
+
   const getCardIcon = (brand: string) => {
     const icons: Record<string, string> = {
       visa: '💳',
@@ -76,6 +150,14 @@ export default function PaymentsPage() {
   return (
     <div className="container-custom py-8">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="mb-4">
+          <BreadcrumbBack
+            parentLabel={parentLabel}
+            parentUrl={parentUrl}
+            currentPage="Payment Methods"
+          />
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -191,7 +273,7 @@ export default function PaymentsPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-              onClick={() => setShowAddModal(false)}
+              onClick={resetAddCardModal}
             >
               <motion.div
                 initial={{ scale: 0.9 }}
@@ -208,39 +290,126 @@ export default function PaymentsPage() {
                   {/* Card Number */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Card Number
+                      Card Number *
+                    </label>
+                    <div className="relative">
+                      <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="cc-number"
+                        value={addCardForm.cardNumber}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, '');
+                          const brand = detectCardBrand(raw);
+                          const maxLen = brand === 'amex' ? 15 : 16;
+                          if (raw.length <= maxLen) {
+                            const formatted = brand === 'amex'
+                              ? raw.replace(/(\d{4})(?=\d)/g, '$1 ').trim()
+                              : raw.replace(/(\d{4})/g, '$1 ').trim();
+                            setAddCardForm((f) => ({ ...f, cardNumber: formatted }));
+                            setAddCardErrors((prev) => ({ ...prev, cardNumber: undefined }));
+                          }
+                        }}
+                        placeholder="1234 5678 9012 3456"
+                        maxLength={19}
+                        className={`w-full pl-11 pr-4 py-3 border-2 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 ${
+                          addCardErrors.cardNumber ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                        }`}
+                      />
+                      {addCardForm.cardNumber && (
+                        <span className="absolute right-10 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-500 capitalize">
+                          {detectCardBrand(addCardForm.cardNumber.replace(/\s/g, ''))}
+                        </span>
+                      )}
+                    </div>
+                    {addCardErrors.cardNumber && (
+                      <p className="text-sm text-red-500 mt-1">{addCardErrors.cardNumber}</p>
+                    )}
+                  </div>
+
+                  {/* Cardholder Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Cardholder Name *
                     </label>
                     <input
                       type="text"
-                      placeholder="1234 5678 9012 3456"
-                      className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30"
-                      maxLength={19}
+                      autoComplete="cc-name"
+                      value={addCardForm.cardName}
+                      onChange={(e) => {
+                        setAddCardForm((f) => ({ ...f, cardName: e.target.value }));
+                        setAddCardErrors((prev) => ({ ...prev, cardName: undefined }));
+                      }}
+                      placeholder="John Doe"
+                      className={`w-full px-4 py-3 border-2 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 ${
+                        addCardErrors.cardName ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                      }`}
                     />
+                    {addCardErrors.cardName && (
+                      <p className="text-sm text-red-500 mt-1">{addCardErrors.cardName}</p>
+                    )}
                   </div>
 
                   {/* Expiry & CVV */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Expiry Date
+                        Expiry Date * (MM/YY)
                       </label>
                       <input
                         type="text"
+                        inputMode="numeric"
+                        autoComplete="cc-exp"
+                        value={addCardForm.expiryDate}
+                        onChange={(e) => {
+                          let value = e.target.value.replace(/\D/g, '');
+                          if (value.length >= 2) value = value.slice(0, 2) + '/' + value.slice(2, 4);
+                          if (value.length <= 5) {
+                            setAddCardForm((f) => ({ ...f, expiryDate: value }));
+                            setAddCardErrors((prev) => ({ ...prev, expiryDate: undefined }));
+                          }
+                        }}
                         placeholder="MM/YY"
-                        className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30"
                         maxLength={5}
+                        className={`w-full px-4 py-3 border-2 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 ${
+                          addCardErrors.expiryDate ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                        }`}
                       />
+                      {addCardErrors.expiryDate && (
+                        <p className="text-sm text-red-500 mt-1">{addCardErrors.expiryDate}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        CVV
+                        CVV * (Security Code)
                       </label>
-                      <input
-                        type="text"
-                        placeholder="123"
-                        className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30"
-                        maxLength={4}
-                      />
+                      <div className="relative">
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          autoComplete="cc-csc"
+                          value={addCardForm.cvv}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            const brand = detectCardBrand(addCardForm.cardNumber.replace(/\s/g, ''));
+                            const maxLen = cvvLengthForBrand(brand);
+                            if (value.length <= maxLen) {
+                              setAddCardForm((f) => ({ ...f, cvv: value }));
+                              setAddCardErrors((prev) => ({ ...prev, cvv: undefined }));
+                            }
+                          }}
+                          placeholder={detectCardBrand(addCardForm.cardNumber.replace(/\s/g, '')) === 'amex' ? '4 digits' : '123'}
+                          maxLength={4}
+                          className={`w-full px-4 py-3 pr-11 border-2 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 ${
+                            addCardErrors.cvv ? 'border-red-500' : 'border-gray-300 dark:border-gray-600 focus:border-blue-500'
+                          }`}
+                        />
+                        <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      </div>
+                      {addCardErrors.cvv && (
+                        <p className="text-sm text-red-500 mt-1">{addCardErrors.cvv}</p>
+                      )}
                     </div>
                   </div>
 
@@ -251,6 +420,8 @@ export default function PaymentsPage() {
                     </label>
                     <input
                       type="text"
+                      value={addCardForm.nickname}
+                      onChange={(e) => setAddCardForm((f) => ({ ...f, nickname: e.target.value }))}
                       placeholder="Personal Card, Business Card..."
                       className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30"
                     />
@@ -260,6 +431,8 @@ export default function PaymentsPage() {
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
+                      checked={addCardForm.setAsDefault}
+                      onChange={(e) => setAddCardForm((f) => ({ ...f, setAsDefault: e.target.checked }))}
                       className="w-4 h-4 text-blue-500 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
@@ -275,13 +448,10 @@ export default function PaymentsPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Button variant="secondary" onClick={() => setShowAddModal(false)} className="flex-1">
+                  <Button variant="secondary" onClick={resetAddCardModal} className="flex-1">
                     Cancel
                   </Button>
-                  <Button variant="primary" className="flex-1" onClick={() => {
-                    toast.success('Card added successfully!');
-                    setShowAddModal(false);
-                  }}>
+                  <Button variant="primary" className="flex-1" onClick={handleAddCardSubmit}>
                     Add Card
                   </Button>
                 </div>

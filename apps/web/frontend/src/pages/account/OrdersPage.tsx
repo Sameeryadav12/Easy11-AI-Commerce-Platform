@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -16,30 +16,39 @@ import {
   Calendar,
   CreditCard,
   AlertCircle,
+  XCircle,
+  Gift,
 } from 'lucide-react';
-import { useOrdersStore, generateMockOrders, Order } from '../../store/ordersStore';
+import { useOrdersStore, Order } from '../../store/ordersStore';
 import { Button } from '../../components/ui';
+import TrackPackageModal from '../../components/orders/TrackPackageModal';
+import CancelOrderModal from '../../components/orders/CancelOrderModal';
+import { downloadInvoice } from '../../components/orders/InvoicePrint';
+import { getDeliveryEtaText } from '../../utils/orderUtils';
+import { computeOrderPoints } from '../../utils/rewardsConstants';
 import toast from 'react-hot-toast';
 
 export default function OrdersPage() {
-  const { orders, setOrders } = useOrdersStore();
+  const { orders, cancelOrder, isLoading } = useOrdersStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | Order['status']>('all');
+  type FilterValue = 'all' | 'delivered' | 'in_transit' | 'cancelled' | 'returned';
+  const [statusFilter, setStatusFilter] = useState<FilterValue>('all');
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
-
-  // Load mock orders
-  useEffect(() => {
-    if (orders.length === 0) {
-      setOrders(generateMockOrders());
-    }
-  }, []);
+  const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
+  const [cancelOrderModal, setCancelOrderModal] = useState<Order | null>(null);
 
   // Filter orders
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.items.some((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    let matchesStatus = true;
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'in_transit') matchesStatus = ['shipped', 'out_for_delivery'].includes(order.status);
+      else if (statusFilter === 'delivered') matchesStatus = order.status === 'delivered';
+      else if (statusFilter === 'cancelled') matchesStatus = order.status === 'cancelled';
+      else if (statusFilter === 'returned') matchesStatus = order.status === 'returned';
+    }
     return matchesSearch && matchesStatus;
   });
 
@@ -83,13 +92,55 @@ export default function OrdersPage() {
     return icons[status];
   };
 
+  /** Order lifecycle: Confirmed → Packed → Shipped → Out for delivery → Delivered */
+  const LIFECYCLE_STEPS: { key: Order['status']; label: string }[] = [
+    { key: 'confirmed', label: 'Confirmed' },
+    { key: 'packed', label: 'Packed' },
+    { key: 'shipped', label: 'Shipped' },
+    { key: 'out_for_delivery', label: 'Out for delivery' },
+    { key: 'delivered', label: 'Delivered' },
+  ];
+  const getLifecycleProgress = (status: Order['status']) => {
+    const idx = LIFECYCLE_STEPS.findIndex((s) => s.key === status);
+    if (idx === -1) return { currentIndex: -1, steps: LIFECYCLE_STEPS };
+    return { currentIndex: idx, steps: LIFECYCLE_STEPS };
+  };
+
+  /** Delivery ETA: "Estimated delivery: Feb 12–14" or "Delivered on Feb 8" or "Updating soon" */
+  const getDeliveryDisplayText = (order: Order): string => getDeliveryEtaText(order);
+
   const handleDownloadInvoice = (order: Order) => {
-    toast.success(`Downloading invoice for order #${order.orderNumber}`);
+    downloadInvoice(order);
+    toast.success(`Invoice for order #${order.orderNumber} ready to print`);
   };
 
   const handleTrackOrder = (order: Order) => {
-    toast.success(`Tracking order #${order.orderNumber}`);
+    setTrackingOrder(order);
   };
+
+  const handleOpenCancelModal = (order: Order) => {
+    setCancelOrderModal(order);
+  };
+
+  const handleConfirmCancel = (opts: {
+    reason: string;
+    reasonOther?: string;
+    cancelEntire: boolean;
+    itemIds: string[];
+  }) => {
+    if (!cancelOrderModal) return;
+    cancelOrder(cancelOrderModal.id, {
+      cancellationReason: opts.reason,
+      cancellationReasonOther: opts.reasonOther,
+    });
+    toast.success('Order cancelled');
+    setCancelOrderModal(null);
+  };
+
+  /** Before shipping → Cancel. Packed/Shipped → Track. Delivered → Return. */
+  const canCancel = (o: Order) => ['pending', 'confirmed', 'packed'].includes(o.status);
+  const canTrack = (o: Order) => ['packed', 'shipped', 'out_for_delivery'].includes(o.status);
+  const canReturn = (o: Order) => o.status === 'delivered';
 
   return (
     <div>
@@ -122,14 +173,13 @@ export default function OrdersPage() {
           {[
             { label: 'All Orders', value: 'all' },
             { label: 'Delivered', value: 'delivered' },
-            { label: 'In Transit', value: 'shipped' },
-            { label: 'Packed', value: 'packed' },
+            { label: 'In Transit', value: 'in_transit' },
             { label: 'Cancelled', value: 'cancelled' },
             { label: 'Returned', value: 'returned' },
           ].map((filter) => (
             <button
               key={filter.value}
-              onClick={() => setStatusFilter(filter.value as any)}
+              onClick={() => setStatusFilter(filter.value as FilterValue)}
               className={`px-4 py-2 rounded-lg font-medium transition-all ${
                 statusFilter === filter.value
                   ? 'bg-blue-500 text-white'
@@ -142,8 +192,16 @@ export default function OrdersPage() {
         </div>
       </div>
 
+      {/* Loading state */}
+      {isLoading && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+          <p className="mt-3 text-gray-600 dark:text-gray-400">Loading orders…</p>
+        </div>
+      )}
+
       {/* Orders List */}
-      {filteredOrders.length > 0 ? (
+      {!isLoading && filteredOrders.length > 0 ? (
         <div className="space-y-4">
           {filteredOrders.map((order) => {
             const isExpanded = expandedOrders.has(order.id);
@@ -163,9 +221,12 @@ export default function OrdersPage() {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="text-lg font-heading font-bold text-gray-900 dark:text-white mb-1">
+                      <Link
+                        to={`/account/orders/${order.id}`}
+                        className="text-lg font-heading font-bold text-gray-900 dark:text-white mb-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors block"
+                      >
                         Order #{order.orderNumber}
-                      </h3>
+                      </Link>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
                         Placed on {new Date(order.date).toLocaleDateString('en-US', {
                           month: 'long',
@@ -173,6 +234,40 @@ export default function OrdersPage() {
                           year: 'numeric',
                         })}
                       </p>
+                      {order.status === 'cancelled' ? (
+                        <>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            {order.cancelledAt
+                              ? (() => {
+                                  const d = new Date(order.cancelledAt);
+                                  const dateStr = d.toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                  });
+                                  const timeStr = d.toLocaleTimeString('en-US', {
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true,
+                                  });
+                                  return `Cancelled on ${dateStr} • ${timeStr}`;
+                                })()
+                              : order.date
+                                ? `Cancelled on ${new Date(order.date).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                  })}`
+                                : 'Cancelled'}
+                            {order.refundInitiated ? '. Refund initiated.' : ''}
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Order closed</p>
+                        </>
+                      ) : getDeliveryDisplayText(order) ? (
+                        <p className="text-sm font-medium text-teal-600 dark:text-teal-400 mt-1">
+                          {getDeliveryDisplayText(order)}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex items-center space-x-3">
                       <span
@@ -223,11 +318,19 @@ export default function OrdersPage() {
                       <p className="text-lg font-bold text-gray-900 dark:text-white">
                         ${order.total.toFixed(2)}
                       </p>
-                      {order.onTimeProbability && order.status === 'shipped' && (
-                        <p className="text-xs text-teal-600 dark:text-teal-400">
-                          ✓ {order.onTimeProbability}% on-time
-                        </p>
-                      )}
+                      {(() => {
+                        const pts = order.pointsEarned ?? computeOrderPoints(order.subtotal ?? 0);
+                        if (pts <= 0) return null;
+                        const isReversed = order.status === 'cancelled' || order.status === 'returned';
+                        const isDelivered = order.status === 'delivered';
+                        const label = isReversed ? `+${pts} pts → reversed` : isDelivered ? `+${pts} pts earned` : `+${pts} pts pending`;
+                        return (
+                          <p className={`text-xs flex items-center justify-end gap-1 ${isReversed ? 'text-rose-600 dark:text-rose-400' : isDelivered ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                            <Gift className="w-3.5 h-3.5" />
+                            {label}
+                          </p>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -243,6 +346,119 @@ export default function OrdersPage() {
                       className="border-t border-gray-200 dark:border-gray-700 overflow-hidden"
                     >
                       <div className="p-6 space-y-6">
+                        {/* Order Lifecycle: Confirmed → Packed → Shipped → Out for delivery → Delivered */}
+                        {!['cancelled', 'returned', 'pending'].includes(order.status) && (
+                          <div>
+                            <h4 className="font-semibold text-gray-900 dark:text-white mb-4">
+                              Order progress
+                            </h4>
+                            <div className="flex items-center gap-0">
+                              {getLifecycleProgress(order.status).steps.map((step, idx) => {
+                                const { currentIndex } = getLifecycleProgress(order.status);
+                                const isComplete = idx < currentIndex;
+                                const isCurrent = idx === currentIndex;
+                                return (
+                                  <div key={step.key} className="flex items-center flex-1">
+                                    <div className="flex flex-col items-center flex-1">
+                                      <div
+                                        className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${
+                                          isComplete
+                                            ? 'bg-teal-500 text-white'
+                                            : isCurrent
+                                              ? 'bg-blue-500 text-white ring-2 ring-blue-200 dark:ring-blue-800'
+                                              : 'bg-gray-200 dark:bg-gray-600 text-gray-500'
+                                        }`}
+                                      >
+                                        {isComplete ? '✓' : idx + 1}
+                                      </div>
+                                      <span
+                                        className={`text-xs mt-2 text-center font-medium ${
+                                          isCurrent
+                                            ? 'text-blue-600 dark:text-blue-400'
+                                            : isComplete
+                                              ? 'text-teal-600 dark:text-teal-400'
+                                              : 'text-gray-400 dark:text-gray-500'
+                                        }`}
+                                      >
+                                        {step.label}
+                                      </span>
+                                    </div>
+                                    {idx < LIFECYCLE_STEPS.length - 1 && (
+                                      <div
+                                        className={`flex-1 h-0.5 mx-1 rounded ${
+                                          isComplete ? 'bg-teal-500' : 'bg-gray-200 dark:bg-gray-600'
+                                        }`}
+                                        style={{ minWidth: 8 }}
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Cancellation & refund (cancelled orders only) */}
+                        {order.status === 'cancelled' && (
+                          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
+                            <h4 className="font-semibold text-gray-900 dark:text-white mb-3">
+                              Cancellation & refund
+                            </h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                              {order.cancelledAt
+                                ? (() => {
+                                    const d = new Date(order.cancelledAt);
+                                    const dateStr = d.toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric',
+                                    });
+                                    const timeStr = d.toLocaleTimeString('en-US', {
+                                      hour: 'numeric',
+                                      minute: '2-digit',
+                                      hour12: true,
+                                    });
+                                    return `Cancelled on ${dateStr} • ${timeStr}. Refund initiated.`;
+                                  })()
+                                : order.date
+                                  ? (() => {
+                                      const d = new Date(order.date);
+                                      const dateStr = d.toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                      });
+                                      return `Cancelled on ${dateStr}. Refund initiated.`;
+                                    })()
+                                  : 'Order cancelled. Refund initiated.'}
+                            </p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                              Refund status: Processing (3–5 business days)
+                            </p>
+                            {order.paymentMethod && (
+                              <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                                Refund method:{' '}
+                                {(() => {
+                                  const match = order.paymentMethod.match(/\s*ending in\s+(\d+)/i);
+                                  if (match) {
+                                    const last4 = match[1];
+                                    const brand = order.paymentMethod.replace(/\s*ending in\s+\d+/i, '').trim();
+                                    const name = brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : 'Card';
+                                    return `${name} •••• ${last4}`;
+                                  }
+                                  return order.paymentMethod;
+                                })()}
+                              </p>
+                            )}
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                              Refund processing: 3–5 business days
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                              You&apos;ll receive an email once the refund is completed.
+                            </p>
+                          </div>
+                        )}
+
                         {/* Items List */}
                         <div>
                           <h4 className="font-semibold text-gray-900 dark:text-white mb-3">
@@ -263,12 +479,12 @@ export default function OrdersPage() {
                                       {item.name}
                                     </p>
                                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                                      Qty: {item.quantity} • {item.category}
+                                      Qty: {Number(item.quantity) || 1} • {item.category}
                                     </p>
                                   </div>
                                 </div>
                                 <p className="font-semibold text-gray-900 dark:text-white">
-                                  ${item.price.toFixed(2)}
+                                  ${(Number(item.price) || 0).toFixed(2)}
                                 </p>
                               </div>
                             ))}
@@ -283,13 +499,29 @@ export default function OrdersPage() {
                               Shipping Address
                             </h4>
                             <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg text-sm text-gray-700 dark:text-gray-300">
-                              <p className="font-medium">{order.shippingAddress.name}</p>
-                              <p>{order.shippingAddress.address}</p>
-                              <p>
-                                {order.shippingAddress.city}, {order.shippingAddress.state}{' '}
-                                {order.shippingAddress.zipCode}
-                              </p>
-                              <p>{order.shippingAddress.country}</p>
+                              {order.status === 'cancelled' ? (
+                                <>
+                                  <p className="text-gray-500 dark:text-gray-400 italic">
+                                    Shipment stopped before dispatch.
+                                  </p>
+                                  <p className="mt-2 font-medium">{order.shippingAddress.name}</p>
+                                  <p>
+                                    {order.shippingAddress.city}, {order.shippingAddress.state}{' '}
+                                    •••{order.shippingAddress.zipCode?.slice(-1) ?? ''}
+                                  </p>
+                                  <p>{order.shippingAddress.country}</p>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="font-medium">{order.shippingAddress.name}</p>
+                                  <p>{order.shippingAddress.address}</p>
+                                  <p>
+                                    {order.shippingAddress.city}, {order.shippingAddress.state}{' '}
+                                    {order.shippingAddress.zipCode}
+                                  </p>
+                                  <p>{order.shippingAddress.country}</p>
+                                </>
+                              )}
                             </div>
                           </div>
 
@@ -299,8 +531,31 @@ export default function OrdersPage() {
                               Payment Method
                             </h4>
                             <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg text-sm text-gray-700 dark:text-gray-300">
-                              <p>{order.paymentMethod}</p>
-                              <p className="mt-2 font-medium">Order Total: ${order.total.toFixed(2)}</p>
+                              {order.status === 'cancelled' ? (
+                                <>
+                                  <p>
+                                    {(() => {
+                                      const match = order.paymentMethod?.match(/\s*ending in\s+(\d+)/i);
+                                      if (match) {
+                                        const last4 = match[1];
+                                        const brand = order.paymentMethod!.replace(/\s*ending in\s+\d+/i, '').trim();
+                                        const name = brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : 'Card';
+                                        return `${name} •••• ${last4}`;
+                                      }
+                                      return order.paymentMethod;
+                                    })()}
+                                  </p>
+                                  <p className="mt-2 text-gray-500 dark:text-gray-400 text-xs">
+                                    Refund will go to this method.
+                                  </p>
+                                  <p className="mt-1 font-medium">Order Total: ${order.total.toFixed(2)}</p>
+                                </>
+                              ) : (
+                                <>
+                                  <p>{order.paymentMethod}</p>
+                                  <p className="mt-2 font-medium">Order Total: ${order.total.toFixed(2)}</p>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -350,36 +605,66 @@ export default function OrdersPage() {
                           </div>
                         )}
 
-                        {/* Actions */}
+                        {/* Actions: View Details always; Cancel / Track / Return by status; for cancelled: View details + Contact support only */}
                         <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleTrackOrder(order)}
-                          >
-                            <Truck className="w-4 h-4 mr-2" />
-                            Track Package
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleDownloadInvoice(order)}
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Download Invoice
-                          </Button>
-                          {order.status === 'delivered' && (
-                            <Link to={`/account/returns?order=${order.id}`}>
-                              <Button variant="ghost" size="sm">
+                          <Link to={`/account/orders/${order.id}`}>
+                            <Button variant="primary" size="sm">
+                              View order details
+                            </Button>
+                          </Link>
+                          {order.status === 'cancelled' ? null : canCancel(order) ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleOpenCancelModal(order)}
+                            >
+                              <XCircle className="w-4 h-4 mr-2" />
+                              Cancel order
+                            </Button>
+                          ) : null}
+                          {canTrack(order) && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleTrackOrder(order)}
+                            >
+                              <Truck className="w-4 h-4 mr-2" />
+                              Track package
+                            </Button>
+                          )}
+                          {canReturn(order) && (
+                            <Link to={`/account/returns?order=${order.id}&from=orders`}>
+                              <Button variant="secondary" size="sm">
                                 <RotateCcw className="w-4 h-4 mr-2" />
-                                Return Item
+                                Return / Refund
                               </Button>
                             </Link>
                           )}
-                          <Button variant="ghost" size="sm">
-                            <MessageSquare className="w-4 h-4 mr-2" />
-                            Contact Support
-                          </Button>
+                          {order.status !== 'cancelled' ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDownloadInvoice(order)}
+                            >
+                              <Download className="w-4 h-4 mr-2" />
+                              Download invoice
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDownloadInvoice(order)}
+                            >
+                              <Download className="w-4 h-4 mr-2" />
+                              Cancelled invoice
+                            </Button>
+                          )}
+                          <Link to="/account/support" state={{ from: 'orders', orderId: order.id }}>
+                            <Button variant="ghost" size="sm">
+                              <MessageSquare className="w-4 h-4 mr-2" />
+                              Contact support
+                            </Button>
+                          </Link>
                         </div>
                       </div>
                     </motion.div>
@@ -389,25 +674,84 @@ export default function OrdersPage() {
             );
           })}
         </div>
-      ) : (
+      ) : !isLoading ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center"
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-16 text-center"
         >
-          <Package className="w-20 h-20 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-heading font-bold text-gray-900 dark:text-white mb-2">
-            No orders found
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <Package className="w-24 h-24 text-gray-300 dark:text-gray-600 mx-auto mb-6" />
+          <h3 className="text-2xl font-heading font-bold text-gray-900 dark:text-white mb-3">
             {searchQuery
-              ? 'Try adjusting your search or filters'
-              : "You haven't placed any orders yet"}
+              ? 'No orders match'
+              : statusFilter !== 'all'
+                ? (() => {
+                    const messages: Record<string, string> = {
+                      delivered: "No delivered orders yet",
+                      in_transit: "No orders in transit",
+                      cancelled: "No cancelled orders yet",
+                      returned: "No returned orders yet",
+                    };
+                    return messages[statusFilter] ?? `No ${statusFilter.replace('_', ' ')} orders yet`;
+                  })()
+                : 'No orders yet'}
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-2">
+            {searchQuery
+              ? 'Try a different search term or order number.'
+              : statusFilter !== 'all'
+                ? (() => {
+                    const subtitles: Record<string, string> = {
+                      delivered: "Orders you've received will show up here.",
+                      in_transit: "Orders that are on the way will appear here.",
+                      cancelled: "Cancelled orders will be listed here.",
+                      returned: "Returned or refunded orders will appear here.",
+                    };
+                    return subtitles[statusFilter] ?? `When you have ${statusFilter.replace('_', ' ')} orders, they'll appear here.`;
+                  })()
+                : 'Your order history will appear here after your first purchase.'}
           </p>
+          {statusFilter !== 'all' && !searchQuery && (
+            <p className="text-sm text-gray-500 dark:text-gray-500">
+              Switch to &quot;All Orders&quot; below to see everything.
+            </p>
+          )}
+          <div className="mb-6" />
+          {(searchQuery || statusFilter !== 'all') && (
+            <Button
+              variant="secondary"
+              className="mr-3"
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('all');
+              }}
+            >
+              Clear filters
+            </Button>
+          )}
           <Link to="/products">
-            <Button variant="primary">Start Shopping</Button>
+            <Button variant="primary">Browse products</Button>
           </Link>
         </motion.div>
+      ) : null}
+
+      {/* Track Package Modal */}
+      {trackingOrder && (
+        <TrackPackageModal
+          isOpen={!!trackingOrder}
+          onClose={() => setTrackingOrder(null)}
+          order={trackingOrder}
+        />
+      )}
+
+      {/* Cancel Order Modal */}
+      {cancelOrderModal && (
+        <CancelOrderModal
+          isOpen={!!cancelOrderModal}
+          onClose={() => setCancelOrderModal(null)}
+          order={cancelOrderModal}
+          onConfirm={handleConfirmCancel}
+        />
       )}
     </div>
   );

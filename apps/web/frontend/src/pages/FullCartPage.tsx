@@ -4,6 +4,8 @@ import { ShoppingBag, Trash2, Plus, Minus, ArrowRight, Tag, Shield, Truck, Arrow
 import toast from 'react-hot-toast';
 import { Button } from '../components/ui';
 import { useCartStore } from '../store/cartStore';
+import { FREE_STANDARD_SHIPPING_THRESHOLD } from '../utils/shippingConstants';
+import { validateRewardCoupon } from '../services/rewardsAPI';
 import { useState } from 'react';
 
 export default function FullCartPage() {
@@ -14,6 +16,7 @@ export default function FullCartPage() {
     updateQuantity,
     discountCode,
     applyDiscount,
+    applyRewardCoupon,
     removeDiscount,
     getTotalItems,
     getSubtotal,
@@ -38,21 +41,34 @@ export default function FullCartPage() {
     });
   };
 
-  const handleApplyDiscount = () => {
-    if (!discountInput.trim()) {
+  const handleApplyDiscount = async () => {
+    const code = discountInput.trim();
+    if (!code) {
       toast.error('Please enter a discount code');
       return;
     }
 
     setIsApplyingDiscount(true);
+    const upper = code.toUpperCase();
+    if (upper.startsWith('E11REWARD')) {
+      try {
+        const data = await validateRewardCoupon(code);
+        const dollarAmount = data.pointsValue / 100;
+        applyRewardCoupon(data.code, dollarAmount);
+        toast.success(`Reward applied: $${dollarAmount.toFixed(2)} off`);
+        setDiscountInput('');
+      } catch {
+        toast.error('Invalid or expired reward code');
+      } finally {
+        setIsApplyingDiscount(false);
+      }
+      return;
+    }
+    applyDiscount(code);
     setTimeout(() => {
-      applyDiscount(discountInput);
       const newDiscount = useCartStore.getState().discountCode;
-      
       if (newDiscount) {
-        toast.success('Discount code applied!', {
-          icon: '🎉',
-        });
+        toast.success('Discount code applied!', { icon: '🎉' });
         setDiscountInput('');
       } else {
         toast.error('Invalid discount code');
@@ -349,7 +365,7 @@ export default function FullCartPage() {
                   </div>
                 )}
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Try: EASY10, EASY20, WELCOME, SAVE50
+                  Try: EASY10, EASY20, WELCOME, SAVE50 — or your E11REWARD-xxx code
                 </p>
               </div>
 
@@ -379,7 +395,7 @@ export default function FullCartPage() {
                 </div>
 
                 <div className="flex justify-between text-gray-700 dark:text-gray-300">
-                  <span>Tax (8%)</span>
+                  <span>GST</span>
                   <span className="font-semibold">${tax.toFixed(2)}</span>
                 </div>
               </div>
@@ -411,7 +427,7 @@ export default function FullCartPage() {
                 </div>
                 <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400">
                   <Truck className="w-5 h-5 text-blue-500" />
-                  <span>Free shipping on orders over $100</span>
+                  <span>Free standard shipping on orders over ${FREE_STANDARD_SHIPPING_THRESHOLD}</span>
                 </div>
               </div>
 

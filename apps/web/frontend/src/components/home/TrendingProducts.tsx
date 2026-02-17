@@ -1,27 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { Link } from 'react-router-dom';
 import { TrendingUp, ArrowRight, Star, Heart, ShoppingCart } from 'lucide-react';
 import { Card, CardBody, Badge, Button } from '../ui';
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice?: number;
-  rating: number;
-  reviews: number;
-  image: string;
-  badge?: string;
-  badgeType?: 'success' | 'warning' | 'info';
-}
+import { ALL_PRODUCTS } from '../../data/productCatalog';
 
 /**
  * Trending Products Component
- * 
- * Displays popular products with AI-powered recommendations.
- * Features horizontal scrollable carousel with hover effects.
+ *
+ * Uses shared catalog so products match the All Products page.
+ * Shows trending-first, then fills with more from catalog.
  */
 export const TrendingProducts: React.FC = () => {
   const { ref, inView } = useInView({
@@ -31,88 +20,11 @@ export const TrendingProducts: React.FC = () => {
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
-  // Sample trending products (will be fetched from API)
-  const products: Product[] = [
-    {
-      id: '1',
-      name: 'Wireless Headphones Pro',
-      price: 299.99,
-      originalPrice: 399.99,
-      rating: 4.8,
-      reviews: 1234,
-      image: '🎧',
-      badge: 'Best Seller',
-      badgeType: 'success',
-    },
-    {
-      id: '2',
-      name: 'Smart Watch Ultra',
-      price: 599.99,
-      rating: 4.9,
-      reviews: 892,
-      image: '⌚',
-      badge: 'New Arrival',
-      badgeType: 'info',
-    },
-    {
-      id: '3',
-      name: 'Designer Backpack',
-      price: 129.99,
-      originalPrice: 179.99,
-      rating: 4.7,
-      reviews: 2103,
-      image: '🎒',
-      badge: 'Trending',
-      badgeType: 'warning',
-    },
-    {
-      id: '4',
-      name: 'Premium Speaker',
-      price: 449.99,
-      rating: 4.6,
-      reviews: 567,
-      image: '🔊',
-      badge: 'Hot Deal',
-      badgeType: 'success',
-    },
-    {
-      id: '5',
-      name: 'Laptop Pro 15"',
-      price: 1299.99,
-      rating: 4.9,
-      reviews: 745,
-      image: '💻',
-      badge: 'Editor\'s Choice',
-      badgeType: 'info',
-    },
-    {
-      id: '6',
-      name: 'Fitness Tracker',
-      price: 89.99,
-      originalPrice: 129.99,
-      rating: 4.5,
-      reviews: 1891,
-      image: '📊',
-      badge: 'Great Value',
-      badgeType: 'success',
-    },
-    {
-      id: '7',
-      name: 'Wireless Mouse',
-      price: 49.99,
-      rating: 4.7,
-      reviews: 3210,
-      image: '🖱️',
-    },
-    {
-      id: '8',
-      name: 'Phone Case Premium',
-      price: 34.99,
-      rating: 4.6,
-      reviews: 5432,
-      image: '📱',
-    },
-  ];
+  const products = useMemo(() => {
+    const trending = ALL_PRODUCTS.filter((p) => p.isTrending);
+    const rest = ALL_PRODUCTS.filter((p) => !p.isTrending);
+    return [...trending, ...rest].slice(0, 12);
+  }, []);
 
   const toggleFavorite = (id: string) => {
     setFavorites((prev) => {

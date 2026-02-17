@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Youtube, Accessibility } from 'lucide-react';
+import { useCookieConsentStore } from '../../store/cookieConsentStore';
 
 export const Footer: React.FC = () => {
+  const openPreferencesModal = useCookieConsentStore((s) => s.openPreferencesModal);
   const scrollToTop = () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
     // Fallback for browsers not supporting 'instant'
@@ -30,8 +32,7 @@ export const Footer: React.FC = () => {
               About Easy11
             </h4>
             <p className="text-gray-400 text-sm mb-4">
-              Shop smarter with AI-powered recommendations. 
-              Your trusted commerce partner for quality products.
+              Quality products, clear returns, and secure checkout. We’re here if you need help.
             </p>
             <div className="flex space-x-4">
               <button
@@ -168,6 +169,18 @@ export const Footer: React.FC = () => {
                   Accessibility
                 </Link>
               </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    scrollToTop();
+                    openPreferencesModal();
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors cursor-pointer text-left"
+                >
+                  Do Not Sell or Share My Personal Information
+                </button>
+              </li>
             </ul>
           </div>
         </div>
@@ -176,12 +189,21 @@ export const Footer: React.FC = () => {
       {/* Bottom Bar */}
       <div className="border-t border-gray-800">
         <div className="container-custom py-6">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <p className="text-gray-400 text-sm">
-              © 2025 Easy11. All rights reserved. Built with ❤️ by Ocean & Sameer
-            </p>
+          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+              <Link
+                to="/accessibility"
+                className="inline-flex items-center gap-2 text-gray-400 hover:text-teal-400 transition-colors text-sm"
+                aria-label="Accessibility - We strive to meet WCAG 2.1 Level AA standards"
+              >
+                <Accessibility className="w-4 h-4" aria-hidden />
+                <span>Accessibility Supported</span>
+              </Link>
+              <p className="text-gray-400 text-sm">
+                © 2025 Easy11. All rights reserved. Built with ❤️ by Ocean & Sameer
+              </p>
+            </div>
             <div className="flex items-center space-x-6">
-              <span className="text-gray-500 text-sm">Powered by AI</span>
               <div className="flex space-x-4">
                 <img src="/payments/visa.svg" alt="Visa" className="h-6 opacity-70" onError={(e) => (e.currentTarget.style.display = 'none')} />
                 <img src="/payments/mastercard.svg" alt="Mastercard" className="h-6 opacity-70" onError={(e) => (e.currentTarget.style.display = 'none')} />

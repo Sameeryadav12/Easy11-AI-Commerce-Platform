@@ -6,15 +6,29 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Plus, Edit2, Trash2, MapPin, Phone, User, CheckCircle } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAddressStore } from '../../store/addressStore';
+import { useAuthStore } from '../../store/authStore';
 import dashboardAPI from '../../services/dashboardAPI';
 import StepUpModal from '../../components/mfa/StepUpModal';
 import { Button } from '../../components/ui';
+import BreadcrumbBack from '../../components/navigation/BreadcrumbBack';
 import toast from 'react-hot-toast';
 import type { Address, AddressFormData } from '../../types/dashboard';
 
 export default function AddressesPage() {
-  const { addresses, setAddresses, addAddress: addToStore, updateAddress: updateInStore, deleteAddress: deleteFromStore } = useAddressStore();
+  const [searchParams] = useSearchParams();
+  const fromParam = searchParams.get('from');
+  const fromProfile = fromParam === 'profile';
+  const {
+    addresses,
+    addAddress: addToStore,
+    updateAddress: updateInStore,
+    deleteAddress: deleteFromStore,
+    setDefaultShipping,
+    setDefaultBilling,
+  } = useAddressStore();
+  const hasHydrated = useAddressStore.persist?.hasHydrated?.() ?? true;
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
@@ -35,20 +49,19 @@ export default function AddressesPage() {
   });
 
   useEffect(() => {
-    loadAddresses();
-  }, []);
-
-  const loadAddresses = async () => {
-    setIsLoading(true);
-    try {
-      const data = await dashboardAPI.getAddresses();
-      setAddresses(data);
-    } catch (error) {
-      toast.error('Failed to load addresses');
-    } finally {
+    const onHydrated = () => {
       setIsLoading(false);
-    }
-  };
+      const state = useAddressStore.getState();
+      const addrs = state.addresses;
+      const shippingDefaults = addrs.filter((a) => a.is_default_shipping);
+      const billingDefaults = addrs.filter((a) => a.is_default_billing);
+      if (shippingDefaults.length > 1) state.setDefaultShipping(shippingDefaults[0].id);
+      if (billingDefaults.length > 1) state.setDefaultBilling(billingDefaults[0].id);
+    };
+    const unsub = useAddressStore.persist?.onFinishHydration?.(onHydrated);
+    if (useAddressStore.persist?.hasHydrated?.()) onHydrated();
+    return () => unsub?.();
+  }, []);
 
   const handleAddNew = () => {
     setEditingAddress(null);
@@ -86,15 +99,49 @@ export default function AddressesPage() {
     setShowForm(true);
   };
 
+  /** Meaningful card title: nickname if set, else "Home Address" for default shipping, else "Address (City)". */
+  const getAddressCardTitle = (address: Address) => {
+    const nickname = (address.nickname || '').trim();
+    if (nickname && nickname !== 'Address' && nickname.toLowerCase() !== 'shipping address') {
+      return nickname;
+    }
+    if (address.is_default_shipping) return 'Home Address';
+    return `Address (${address.city || 'Other'})`;
+  };
+
   const handleSave = async () => {
     try {
       if (editingAddress) {
-        const updated = await dashboardAPI.updateAddress(editingAddress.id, formData);
+        const updated = {
+          ...formData,
+          updated_at: new Date().toISOString(),
+        };
         updateInStore(editingAddress.id, updated);
+        if (formData.is_default_shipping) setDefaultShipping(editingAddress.id);
+        if (formData.is_default_billing) setDefaultBilling(editingAddress.id);
         toast.success('Address updated successfully!');
       } else {
-        const created = await dashboardAPI.createAddress(formData);
-        addToStore(created);
+        const user = useAuthStore.getState().user;
+        const newAddress: Address = {
+          id: `addr_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+          user_id: user?.id ?? 'anon',
+          nickname: formData.nickname.trim() || 'Address',
+          full_name: formData.full_name,
+          phone: formData.phone,
+          line1: formData.line1,
+          line2: formData.line2,
+          city: formData.city,
+          state: formData.state,
+          country: formData.country,
+          postal_code: formData.postal_code,
+          is_default_shipping: formData.is_default_shipping,
+          is_default_billing: formData.is_default_billing,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        addToStore(newAddress);
+        if (formData.is_default_shipping) setDefaultShipping(newAddress.id);
+        if (formData.is_default_billing) setDefaultBilling(newAddress.id);
         toast.success('Address added successfully!');
       }
       setShowForm(false);
@@ -113,7 +160,7 @@ export default function AddressesPage() {
 
     if (deleteTarget) {
       try {
-        await dashboardAPI.deleteAddress(deleteTarget);
+        // Delete from store directly (addresses may exist only in addressStore)
         deleteFromStore(deleteTarget);
         toast.success('Address deleted successfully!');
         setDeleteTarget(null);
@@ -137,6 +184,16 @@ export default function AddressesPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
+        {fromProfile && (
+          <div className="mb-4">
+            <BreadcrumbBack
+              parentLabel="Profile"
+              parentUrl="/account/profile"
+              currentPage="My Addresses"
+            />
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -178,8 +235,8 @@ export default function AddressesPage() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-5 h-5 text-blue-500" />
-                    <h3 className="font-heading font-bold text-gray-900 dark:text-white">
-                      {address.nickname}
+                    <h3 className="font-heading font-bold text-gray-900 dark:text-white capitalize">
+                      {getAddressCardTitle(address)}
                     </h3>
                   </div>
                   <div className="flex gap-1">
@@ -222,6 +279,7 @@ export default function AddressesPage() {
                   </p>
                 </div>
 
+                {/* Only one address shows Default Shipping, only one shows Default Billing */}
                 {(address.is_default_shipping || address.is_default_billing) && (
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
                     {address.is_default_shipping && (
@@ -267,13 +325,13 @@ export default function AddressesPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Nickname
+                      Address name
                     </label>
                     <input
                       type="text"
                       value={formData.nickname}
                       onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
-                      placeholder="Home, Work, Parents..."
+                      placeholder="e.g. Home, Work, Parents..."
                       className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30"
                     />
                   </div>

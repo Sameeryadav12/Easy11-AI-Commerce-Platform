@@ -1,5 +1,14 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Scale, AlertCircle, CheckCircle, XCircle, Mail, Calendar } from 'lucide-react';
+import { FileText, Scale, AlertCircle, CheckCircle, XCircle, Mail, Calendar, ArrowUp, Printer } from 'lucide-react';
+
+/** Shared contact info - keep consistent across legal pages */
+const LEGAL_CONTACT = {
+  email: 'legal@easy11.com',
+  support: 'support@easy11.com',
+  privacy: 'privacy@easy11.com',
+  address: 'Melbourne, Victoria, Australia',
+};
 
 /**
  * Terms of Service Page
@@ -10,6 +19,13 @@ import { FileText, Scale, AlertCircle, CheckCircle, XCircle, Mail, Calendar } fr
  */
 export default function TermsPage() {
   const lastUpdated = 'January 15, 2025';
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setShowBackToTop(window.scrollY > 400);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const sections = [
     {
@@ -198,11 +214,11 @@ Upon termination, your right to use the Service will cease immediately. We may d
     {
       id: 'governing-law',
       title: 'Governing Law',
-      content: `These Terms shall be governed by and construed in accordance with the laws of the State of California, United States, without regard to its conflict of law provisions.
+      content: `These Terms shall be governed by and construed in accordance with the laws of the State of Victoria, Australia, without regard to its conflict of law provisions.
 
-Any disputes arising from or relating to these Terms or the Service shall be subject to the exclusive jurisdiction of the state and federal courts located in San Francisco, California.
+Any disputes arising from or relating to these Terms or the Service shall be subject to the exclusive jurisdiction of the courts of Victoria, Australia.
 
-If you are located outside the United States, you agree that any disputes will be resolved in accordance with applicable local laws and regulations.`,
+If you are located outside Australia, you agree that any disputes will be resolved in accordance with applicable local laws and regulations.`,
     },
     {
       id: 'changes',
@@ -222,8 +238,9 @@ Your continued use of the Service after changes become effective constitutes you
       content: `If you have any questions about these Terms of Service, please contact us:
 
 **Email:** legal@easy11.com
-**Phone:** 1-800-EASY-11
-**Address:** 123 Commerce Street, San Francisco, CA 94105, United States
+**Support:** support@easy11.com
+**Privacy:** privacy@easy11.com
+**Address:** Melbourne, Victoria, Australia
 
 For general inquiries, please use our contact form or visit our support center.`,
     },
@@ -282,34 +299,44 @@ For general inquiries, please use our contact form or visit our support center.`
           </div>
         </motion.div>
 
-        {/* Quick Navigation */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="mb-12"
-        >
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Quick Navigation
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {sections.map((section) => (
-                <a
-                  key={section.id}
-                  href={`#${section.id}`}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  {section.title}
-                </a>
-              ))}
+        {/* Layout: sticky Quick Nav + content */}
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          {/* Quick Navigation - sticky on desktop */}
+          <motion.aside
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="w-full lg:w-64 flex-shrink-0 lg:sticky lg:top-24"
+          >
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Quick Navigation
+              </h2>
+              <nav className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
+                {sections.map((section) => (
+                  <a
+                    key={section.id}
+                    href={`#${section.id}`}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline py-1"
+                  >
+                    {section.title}
+                  </a>
+                ))}
+              </nav>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                <Printer className="w-4 h-4" />
+                Print / Save PDF
+              </button>
             </div>
-          </div>
-        </motion.div>
+          </motion.aside>
 
-        {/* Terms Content */}
-        <div className="max-w-4xl mx-auto space-y-12">
+          {/* Terms Content */}
+          <div className="flex-1 min-w-0 max-w-4xl space-y-12">
           {sections.map((section, index) => (
             <motion.section
               key={section.id}
@@ -317,7 +344,7 @@ For general inquiries, please use our contact form or visit our support center.`
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 + index * 0.05 }}
-              className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700"
+              className="scroll-mt-28 bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700"
             >
               <h2 className="text-3xl font-heading font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
                 {section.id === 'disclaimers' && <AlertCircle className="w-8 h-8 text-amber-600 dark:text-amber-400" />}
@@ -367,6 +394,7 @@ For general inquiries, please use our contact form or visit our support center.`
               </div>
             </motion.section>
           ))}
+          </div>
         </div>
 
         {/* Acceptance Notice */}
@@ -385,7 +413,7 @@ For general inquiries, please use our contact form or visit our support center.`
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <a
-                href="mailto:legal@easy11.com"
+                href={`mailto:${LEGAL_CONTACT.email}`}
                 className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
               >
                 <Mail className="w-5 h-5 mr-2" />
@@ -401,6 +429,21 @@ For general inquiries, please use our contact form or visit our support center.`
           </div>
         </motion.div>
       </div>
+
+      {/* Back to top - floating button */}
+      {showBackToTop && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 right-6 z-50 p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 print:hidden"
+          aria-label="Back to top"
+        >
+          <ArrowUp className="w-5 h-5" />
+        </motion.button>
+      )}
     </div>
   );
 }

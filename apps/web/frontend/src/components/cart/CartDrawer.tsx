@@ -15,11 +15,13 @@ export default function CartDrawer() {
     getTotalItems,
     getSubtotal,
     getShipping,
+    getTax,
     getTotal,
   } = useCartStore();
 
   const subtotal = getSubtotal();
   const shipping = getShipping();
+  const gst = getTax();
   const total = getTotal();
   const freeShippingThreshold = 100;
   const progressToFreeShipping = Math.min((subtotal / freeShippingThreshold) * 100, 100);
@@ -85,12 +87,12 @@ export default function CartDrawer() {
                 </div>
               ) : (
                 <>
-                  {/* Free Shipping Progress */}
+                  {/* Free Express Shipping Progress (Standard is always free) */}
                   {subtotal < freeShippingThreshold && (
                     <div className="bg-gradient-to-r from-blue-50 to-teal-50 dark:from-blue-900/20 dark:to-teal-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-900 dark:text-white">
-                          {progressToFreeShipping.toFixed(0)}% to free shipping
+                          {progressToFreeShipping.toFixed(0)}% to free Express shipping
                         </span>
                         <span className="text-sm text-gray-600 dark:text-gray-400">
                           ${(freeShippingThreshold - subtotal).toFixed(2)} to go
@@ -112,7 +114,7 @@ export default function CartDrawer() {
                       <div className="flex items-center space-x-2">
                         <Sparkles className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                         <span className="text-sm font-semibold text-teal-900 dark:text-teal-100">
-                          You've unlocked FREE shipping! 🎉
+                          You&apos;ve unlocked FREE Express shipping! 🎉
                         </span>
                       </div>
                     </div>
@@ -203,6 +205,12 @@ export default function CartDrawer() {
                       `$${shipping.toFixed(2)}`
                     )}
                   </span>
+                </div>
+
+                {/* GST */}
+                <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                  <span>GST</span>
+                  <span className="font-semibold">${gst.toFixed(2)}</span>
                 </div>
 
                 {/* Total */}

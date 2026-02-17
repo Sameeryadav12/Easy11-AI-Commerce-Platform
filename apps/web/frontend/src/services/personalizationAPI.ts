@@ -20,7 +20,7 @@ const mockProducts = [
     currency: 'USD',
     image: '👟',
     badges: ['Low stock', 'Trending near you'],
-    url: '/products/11',
+    url: '/products/13',
   },
   {
     id: 'p-1002',
@@ -29,7 +29,7 @@ const mockProducts = [
     currency: 'USD',
     image: '🧥',
     badges: ['New arrival'],
-    url: '/products/5',
+    url: '/products/14',
   },
   {
     id: 'p-1003',
@@ -37,8 +37,8 @@ const mockProducts = [
     price: 159.99,
     currency: 'USD',
     image: '👜',
-    badges: ['Staff pick'],
-    url: '/products/3',
+    badges: ['Staff pick', 'Out of stock'],
+    url: '/products/15',
   },
   {
     id: 'p-1004',
@@ -47,7 +47,43 @@ const mockProducts = [
     currency: 'USD',
     image: '💡',
     badges: ['Seasonal drop'],
-    url: '/products/9',
+    url: '/products/16',
+  },
+  {
+    id: 'p-1005',
+    title: 'Pro Noise-Canceling Earbuds',
+    price: 249.99,
+    currency: 'USD',
+    image: '🎧',
+    badges: ['Out of stock'],
+    url: '/products/17',
+  },
+  {
+    id: 'p-1006',
+    title: 'Minimalist Leather Wallet',
+    price: 64.99,
+    currency: 'USD',
+    image: '👛',
+    badges: ['Out of stock'],
+    url: '/products/18',
+  },
+  {
+    id: 'p-1007',
+    title: 'CloudComfort Memory Foam Pillow',
+    price: 49.99,
+    currency: 'USD',
+    image: '🛏️',
+    badges: ['Best seller'],
+    url: '/products/19',
+  },
+  {
+    id: 'p-1008',
+    title: 'AquaStride Water Bottle 1L',
+    price: 29.99,
+    currency: 'USD',
+    image: '🥤',
+    badges: ['Eco-friendly'],
+    url: '/products/20',
   },
 ];
 
@@ -84,15 +120,22 @@ export const fetchHomeExperience = async (
         'Finish the look',
         'Match accessories with your new favorites',
         'set_completion',
-        3,
+        4,
       ),
-      items: mockProducts.slice(1, 4).map((item, idx) => ({
+      items: [...mockProducts.slice(1, 4), mockProducts[4]].map((item, idx) => ({
         ...item,
         score: 0.81 - idx * 0.05,
-        reason: 'Complements items in cart',
+        reason: idx < 3 ? 'Complements items in cart' : 'Add to wishlist for restock alert',
       })),
     },
-    buildSection('home-trending-nearby', 'Trending near you', 'Popular with shoppers in Austin', 'geo_trending', 4),
+    {
+      ...buildSection('home-trending-nearby', 'Trending near you', 'Popular with shoppers in Austin', 'geo_trending', 6),
+      items: [...mockProducts.slice(0, 4), mockProducts[5], mockProducts[6]].map((item, idx) => ({
+        ...item,
+        score: 0.86 - idx * 0.04,
+        reason: item.badges?.includes('Out of stock') ? 'Add to wishlist for restock' : 'High purchase intent',
+      })),
+    },
   ];
 };
 
