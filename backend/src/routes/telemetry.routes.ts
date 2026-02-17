@@ -40,10 +40,8 @@ router.post('/events', async (req, res, next) => {
     const validated = telemetrySchema.parse(payload);
     
     // Ensure timestamp is always a string for TelemetryPayload
-    const telemetryPayload = {
-      ...validated,
-      timestamp: validated.timestamp || new Date().toISOString(),
-    };
+    const timestamp: string = validated.timestamp ?? new Date().toISOString();
+    const telemetryPayload = { ...validated, timestamp };
 
     const result = await publishTelemetryEvent(telemetryPayload);
 
