@@ -37,9 +37,10 @@ export const prisma = new PrismaClient({
 });
 
 // Allowed CORS origins (comma-separated in FRONTEND_URL, or single value)
+// Normalize: trim and remove trailing slash so https://app.vercel.app/ matches https://app.vercel.app
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
   .split(',')
-  .map((o) => o.trim())
+  .map((o) => o.trim().replace(/\/+$/, ''))
   .filter(Boolean);
 if (!allowedOrigins.length) allowedOrigins.push('http://localhost:3000');
 
@@ -47,7 +48,10 @@ if (!allowedOrigins.length) allowedOrigins.push('http://localhost:3000');
 app.use(helmet());
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    if (!origin) return cb(null, true); // same-origin or non-browser
+    const normalizedOrigin = origin.replace(/\/+$/, '');
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes(normalizedOrigin)) return cb(null, true);
+    logger.warn('CORS rejected origin (add to FRONTEND_URL on Render):', origin);
     return cb(null, false);
   },
   credentials: true,
@@ -95,6 +99,11 @@ app.get('/health', async (req: Request, res: Response) => {
 
   const statusCode = health.status === 'healthy' ? 200 : 503;
   res.status(statusCode).json(health);
+});
+
+// Simple ping under API base (for frontend/connectivity checks)
+app.get('/api/v1/ping', (req: Request, res: Response) => {
+  res.json({ ok: true, timestamp: new Date().toISOString() });
 });
 
 // API Routes

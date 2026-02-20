@@ -210,6 +210,50 @@ If anything fails, check:
 - **Render:** Logs tab; `DATABASE_URL` and `FRONTEND_URL` correct; `/health` returns healthy.
 - **Neon:** In the Neon dashboard, check that the database has tables (e.g. after running migrations in Part 1.2).
 
+### Fixing “Network error: Unable to reach server” or “Service temporarily unavailable”
+
+If you see **“Network error: Unable to reach server”** when registering or logging in, or an orange **“Service temporarily unavailable”** banner, the frontend cannot reach your Render API. Fix it in this order:
+
+1. **Set and redeploy Vercel (most common cause)**  
+   - In **Vercel** → your project → **Settings** → **Environment Variables**, add or edit:
+     - **Name:** `VITE_API_URL`  
+     - **Value:** `https://YOUR-RENDER-URL/api/v1`  
+       Example: `https://easy11-ai-commerce-platform.onrender.com/api/v1`  
+       (Replace with your real Render service URL; no trailing slash.)
+   - **Important:** Vite bakes this into the build. After changing it you **must redeploy**: **Deployments** → ⋮ on the latest deployment → **Redeploy**. Otherwise the app still uses the old (or empty) URL.
+
+2. **Wake Render (free tier)**  
+   - Free instances spin down after ~15 minutes of no traffic. The first request can take **50+ seconds**.
+   - Open in a new tab: `https://YOUR-RENDER-URL/health` (e.g. `https://easy11-ai-commerce-platform.onrender.com/health`). Wait until you see `{"status":"healthy", ...}`.
+   - Then try **Create Account** or **Sign in** again on your Vercel site.
+
+3. **CORS: set FRONTEND_URL on Render (very common cause of “Network error”)**  
+   - The browser sends your **Vercel site’s origin** (e.g. `https://easy11-xyz.vercel.app`) with each request. Render only allows requests when that origin is in **`FRONTEND_URL`**.
+   - In **Render** → your service → **Environment**, set **`FRONTEND_URL`** to your **exact Vercel URL**:
+     - Open your live site in the browser and **copy the URL from the address bar** (e.g. `https://easy11-xyz.vercel.app`).
+     - Paste that as the value of `FRONTEND_URL` — **no trailing slash**, **same protocol (https)** and **exact domain**.
+   - Save and run **Manual Deploy** so the new origin is allowed.
+   - **If you use multiple Vercel URLs** (e.g. preview deployments), set `FRONTEND_URL` to a comma-separated list: `https://easy11-xyz.vercel.app,https://easy11-xyz-git-main.vercel.app`.
+
+4. **Verify in the browser**  
+   - On your **Vercel site**, open **Developer Tools** (F12) → **Network** tab.  
+   - Click **Create Account** (or **Sign in**) and watch the first request:
+     - **Request URL** should be `https://YOUR-RENDER-URL.onrender.com/api/v1/auth/register` (or `/auth/login`). If it shows your Vercel domain instead of Render, `VITE_API_URL` is not set or not applied — set it and **redeploy Vercel**.
+     - If the request is **blocked** (red, “CORS” or “blocked by CORS policy” in Console), add that exact origin to **`FRONTEND_URL`** on Render and redeploy Render.
+   - You can also test connectivity: on your Vercel site, open the **Console** tab and run:  
+     `fetch('https://easy11-ai-commerce-platform.onrender.com/api/v1/ping').then(r=>r.json()).then(console.log)`  
+     (Replace with your Render URL.) If you see `{ok: true, ...}`, the API and CORS are fine. If you get a CORS error, fix `FRONTEND_URL` on Render.
+
+5. **Check Render logs**  
+   - In **Render** → your service → **Logs**, look for a line like: **`CORS rejected origin (add to FRONTEND_URL on Render): https://your-vercel-url.vercel.app`**.  
+   - If you see that, add that **exact** URL to **`FRONTEND_URL`** (or as an extra value in a comma-separated list), save, and **Manual Deploy**.
+
+6. **Double-check**  
+   - No typo in the Render URL in `VITE_API_URL`.  
+   - `VITE_API_URL` has no trailing slash.  
+   - You **redeployed Vercel** after setting or changing `VITE_API_URL`.  
+   - `FRONTEND_URL` on Render matches the URL in your browser when you use the app (no trailing slash).
+
 ## 4.2 — Default logins (if you seeded)
 
 If you ran `npm run prisma:seed` against Neon in Part 1.2, you can also log in with:
