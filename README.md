@@ -4,6 +4,20 @@
 
 **Repository:** [github.com/Sameeryadav12/Easy11-AI-Commerce-Platform](https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform)
 
+[![Live Demo](https://img.shields.io/badge/demo-live-success?style=for-the-badge)](https://easy11.vercel.app/)
+[![CI/CD](https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform/actions)
+[![Test Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)](./apps/web/frontend)
+[![Security](https://img.shields.io/badge/security-0%20critical-green)](https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform/security/advisories)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+---
+
+## Live Demo
+
+**Try the app:** [**https://easy11.vercel.app/**](https://easy11.vercel.app/)
+
+Sign up, browse products, add to cart, place orders, and use Account (Orders, Rewards, Support). The API may take a few seconds to wake on first load; if you see "Service temporarily unavailable", wait a moment and refresh.
+
 ---
 
 ## Documentation
@@ -14,19 +28,7 @@
 | [**Full documentation**](./docs/README.md) | Single index for all docs: getting started, architecture, runbooks, compliance, sprints, reference. |
 | [**Deployment guide**](./docs/DEPLOYMENT_GUIDE.md) | Deploy customer site (Vercel), API (Render), and DB (Neon); demo user flow; deployment diagram. |
 | [**Deploy step-by-step**](./docs/DEPLOY_STEP_BY_STEP.md) | Detailed walkthrough: Neon → Render → Vercel (for new accounts). |
-
----
-
-## Live demo (deployed app)
-
-If you're viewing a **deployed** version of this app: the **API may take a few seconds to wake up** on first load (typical for free-tier hosting). If you see a temporary “Service unavailable” message, wait a moment and refresh or retry. For a step-by-step **demo user flow** (sign up → order → rewards → support), see [Deployment guide → Demo user flow](./docs/DEPLOYMENT_GUIDE.md#demo-user-flow-for-recruiters).
-
----
-
-[![CI/CD](https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform/actions)
-[![Test Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)](./apps/web/frontend)
-[![Security](https://img.shields.io/badge/security-0%20critical-green)](https://github.com/Sameeryadav12/Easy11-AI-Commerce-Platform/security/advisories)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+| [**Push to GitHub**](./docs/PUSH_TO_GITHUB.md) | Clone, push, and connect the repo to GitHub. |
 
 ---
 

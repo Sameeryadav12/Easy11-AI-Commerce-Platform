@@ -2,6 +2,8 @@
 
 Single entry point for all Easy11 Commerce Intelligence Platform documentation. Use the table of contents below to reach any section.
 
+**Live demo:** [https://easy11.vercel.app/](https://easy11.vercel.app/)
+
 ---
 
 ## Table of contents
